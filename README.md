@@ -24,3 +24,7 @@ npm run build
 - 备忘录保存在当前浏览器的 `localStorage`。
 - 临时文件保存在当前浏览器的 `IndexedDB`。
 - 当前版本不会把文件上传到 GitHub，也不会跨设备同步。
+
+## 项目文档
+
+后续维护前先阅读 `AGENTS.md` 和 `docs/PROJECT_CONTEXT.md`。
