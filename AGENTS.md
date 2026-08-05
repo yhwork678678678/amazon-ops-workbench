@@ -3,6 +3,9 @@
 本项目是用户的“亚马逊运营个人工作台”，用于部署到 GitHub Pages。任何后续 Codex 会话进入本仓库后，先阅读：
 
 - `docs/PROJECT_CONTEXT.md`
+- `docs/DESIGN.md`
+- `docs/CONTENT.md`
+- `docs/VERSION.md`
 - `README.md`
 
 ## 当前执行原则

@@ -109,6 +109,9 @@ D:\桌面\工作\工作台
 - `.github/workflows/deploy.yml`：GitHub Pages 自动部署。
 - `AGENTS.md`：给后续 Codex 会话的快速入口。
 - `README.md`：给用户和 GitHub 仓库首页看的简短说明。
+- `docs/DESIGN.md`：产品、视觉、交互、技术设计细节。
+- `docs/CONTENT.md`：页面模块、文案、工具入口和内容维护规范。
+- `docs/VERSION.md`：版本记录、当前状态和后续路线。
 
 ## 6. 视觉和交互设计
 
