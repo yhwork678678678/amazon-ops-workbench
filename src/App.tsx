@@ -44,6 +44,18 @@ type StoredFile = {
   blob: Blob
 }
 
+type UploadedFile = {
+  id: string
+  name: string
+  size: number
+  type: string
+  uploadedAt: string
+  path: string
+  htmlUrl?: string
+  commitUrl?: string
+  sha?: string
+}
+
 type CalculatorState = {
   salePrice: number
   cost: number
@@ -66,7 +78,11 @@ const STORAGE_KEYS = {
   notes: 'amazon-workbench-notes',
   calculator: 'amazon-workbench-calculator',
   workflows: 'amazon-workbench-workflows',
+  uploadedFiles: 'amazon-workbench-uploaded-files',
+  uploadKey: 'amazon-workbench-upload-key',
 }
+
+const uploadWorkerUrl = import.meta.env.VITE_UPLOAD_WORKER_URL as string | undefined
 
 const defaultNotes: Note[] = [
   {
@@ -161,6 +177,22 @@ function readStoredCalculator() {
   } catch {
     return defaultCalculator
   }
+}
+
+function readStoredUploadedFiles() {
+  const raw = localStorage.getItem(STORAGE_KEYS.uploadedFiles)
+  if (!raw) return []
+
+  try {
+    const parsed = JSON.parse(raw) as UploadedFile[]
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function readStoredUploadKey() {
+  return localStorage.getItem(STORAGE_KEYS.uploadKey) || ''
 }
 
 function readStoredWorkflows() {
@@ -267,6 +299,12 @@ export function App() {
   const [noteDueAt, setNoteDueAt] = useState('')
   const [files, setFiles] = useState<StoredFile[]>([])
   const [fileMessage, setFileMessage] = useState('文件只保存在当前浏览器，不会上传到 GitHub。')
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>(readStoredUploadedFiles)
+  const [uploadKey, setUploadKey] = useState(readStoredUploadKey)
+  const [cloudFileMessage, setCloudFileMessage] = useState(
+    uploadWorkerUrl ? '上传后会写入私密 GitHub 文件仓库。' : '需要先配置 VITE_UPLOAD_WORKER_URL 才能上传。',
+  )
+  const [cloudUploading, setCloudUploading] = useState(false)
   const [clock, setClock] = useState(() => new Date())
   const [reminderMessage, setReminderMessage] = useState('')
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() =>
@@ -274,6 +312,7 @@ export function App() {
   )
   const [calculator, setCalculator] = useState<CalculatorState>(readStoredCalculator)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cloudFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.notes, JSON.stringify(notes))
@@ -286,6 +325,18 @@ export function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.workflows, JSON.stringify(workflows))
   }, [workflows])
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.uploadedFiles, JSON.stringify(uploadedFiles))
+  }, [uploadedFiles])
+
+  useEffect(() => {
+    if (uploadKey) {
+      localStorage.setItem(STORAGE_KEYS.uploadKey, uploadKey)
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.uploadKey)
+    }
+  }, [uploadKey])
 
   useEffect(() => {
     const timer = window.setInterval(() => setClock(new Date()), 30_000)
@@ -440,6 +491,50 @@ export function App() {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  async function uploadCloudFile(file: File) {
+    if (!uploadWorkerUrl) throw new Error('没有配置上传服务地址。')
+    if (!uploadKey.trim()) throw new Error('请先填写上传密钥。')
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch(uploadWorkerUrl, {
+      method: 'POST',
+      headers: {
+        'x-upload-key': uploadKey.trim(),
+      },
+      body: formData,
+    })
+
+    const payload = await response.json() as { file?: Omit<UploadedFile, 'id'>; error?: string }
+    if (!response.ok || !payload.file) {
+      throw new Error(payload.error || '上传失败。')
+    }
+
+    return {
+      id: crypto.randomUUID(),
+      ...payload.file,
+    }
+  }
+
+  async function handleCloudFiles(fileList: FileList | null) {
+    if (!fileList?.length || cloudUploading) return
+
+    setCloudUploading(true)
+    setCloudFileMessage(`正在上传 ${fileList.length} 个文件到私密 GitHub 仓库...`)
+
+    try {
+      const uploaded = await Promise.all(Array.from(fileList).map((file) => uploadCloudFile(file)))
+      setUploadedFiles((current) => [...uploaded, ...current])
+      setCloudFileMessage(`${uploaded.length} 个文件已上传到私密 GitHub 仓库。`)
+    } catch (error) {
+      setCloudFileMessage(error instanceof Error ? error.message : '上传失败，请稍后重试。')
+    } finally {
+      setCloudUploading(false)
+      if (cloudFileInputRef.current) cloudFileInputRef.current.value = ''
+    }
+  }
+
   function downloadFile(file: StoredFile) {
     const url = URL.createObjectURL(file.blob)
     const link = document.createElement('a')
@@ -508,7 +603,7 @@ export function App() {
             </button>
             <button type="button" onClick={() => fileInputRef.current?.click()}>
               <FileUp size={16} />
-              添加文件
+              添加临时文件
             </button>
             {notificationPermission === 'default' && (
               <button type="button" onClick={() => void enableNotifications()}>
@@ -607,8 +702,8 @@ export function App() {
                         <option value={30}>提前 30 分钟</option>
                       </select>
                     </div>
-                    </div>
                   </div>
+                </div>
                 <div className="workflow-editor-actions">
                   <button type="submit" className="icon-text-button primary-button">
                     <Save size={16} />
@@ -729,8 +824,8 @@ export function App() {
           </article>
         </section>
 
-        <section className="split-grid">
-          <article className="panel" id="files">
+        <section className="file-workspace" id="files">
+          <article className="panel">
             <div className="section-heading">
               <div>
                 <p className="eyebrow">Local vault</p>
@@ -777,6 +872,71 @@ export function App() {
             </div>
           </article>
 
+          <article className="panel">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">GitHub vault</p>
+                <h3>上传文件区</h3>
+              </div>
+              <FileUp size={20} />
+            </div>
+
+            <input
+              className="sr-only"
+              ref={cloudFileInputRef}
+              type="file"
+              multiple
+              onChange={(event) => void handleCloudFiles(event.target.files)}
+            />
+
+            <label className="upload-key-field">
+              <span>上传密钥</span>
+              <input
+                type="password"
+                placeholder="输入 Worker 上传密钥"
+                value={uploadKey}
+                onChange={(event) => setUploadKey(event.target.value)}
+              />
+            </label>
+
+            <button
+              className="upload-zone cloud-upload-zone"
+              type="button"
+              disabled={!uploadWorkerUrl || !uploadKey.trim() || cloudUploading}
+              onClick={() => cloudFileInputRef.current?.click()}
+            >
+              <FileUp size={24} />
+              <span>{cloudUploading ? '正在上传...' : '上传到私密 GitHub 仓库'}</span>
+              <small>{cloudFileMessage}</small>
+            </button>
+
+            <div className="file-list">
+              {uploadedFiles.length === 0 ? (
+                <p className="empty-state">还没有上传记录。适合保存需要换电脑也能找回的运营文件。</p>
+              ) : (
+                uploadedFiles.map((file) => (
+                  <div className="file-row cloud-file-row" key={file.id}>
+                    <FileText size={18} />
+                    <div>
+                      <strong>{file.name}</strong>
+                      <span>
+                        {formatBytes(file.size)} · {new Date(file.uploadedAt).toLocaleString('zh-CN')}
+                      </span>
+                      <small>{file.path}</small>
+                    </div>
+                    {file.htmlUrl && (
+                      <button type="button" title="在 GitHub 查看" onClick={() => openExternal(file.htmlUrl!)}>
+                        <ExternalLink size={16} />
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </article>
+        </section>
+
+        <section className="split-grid">
           <article className="panel" id="notes">
             <div className="section-heading">
               <div>

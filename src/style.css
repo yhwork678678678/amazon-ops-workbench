@@ -214,7 +214,8 @@ p {
 }
 
 .overview-grid,
-.split-grid {
+.split-grid,
+.file-workspace {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 18px;
@@ -222,6 +223,10 @@ p {
 
 .split-grid {
   grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+}
+
+.file-workspace {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .panel,
@@ -577,6 +582,36 @@ p {
   padding: 18px;
 }
 
+.upload-zone:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.cloud-upload-zone {
+  margin-top: 12px;
+  border-color: var(--amber);
+  background: #fff5d9;
+}
+
+.upload-key-field {
+  display: grid;
+  gap: 6px;
+}
+
+.upload-key-field span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.upload-key-field input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fffefa;
+  color: var(--ink);
+  padding: 10px;
+}
+
 .file-list,
 .note-list {
   display: grid;
@@ -594,8 +629,20 @@ p {
   padding: 10px;
 }
 
+.cloud-file-row {
+  grid-template-columns: 20px minmax(0, 1fr) 34px;
+}
+
 .file-row strong {
   display: block;
+  overflow-wrap: anywhere;
+}
+
+.file-row small {
+  display: block;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
   overflow-wrap: anywhere;
 }
 
@@ -688,7 +735,8 @@ p {
   }
 
   .overview-grid,
-  .split-grid {
+  .split-grid,
+  .file-workspace {
     grid-template-columns: 1fr;
   }
 

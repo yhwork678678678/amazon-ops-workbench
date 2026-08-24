@@ -1,0 +1,13 @@
+name = "amazon-ops-workbench-upload"
+main = "worker/upload.js"
+compatibility_date = "2026-08-24"
+workers_dev = true
+preview_urls = false
+
+[vars]
+ALLOWED_ORIGIN = "https://yhwork678678678.github.io"
+GITHUB_OWNER = "yhwork678678678"
+GITHUB_REPO = "amazon-ops-workbench-files"
+GITHUB_BRANCH = "main"
+UPLOAD_DIR = "uploads"
+MAX_FILE_BYTES = "20971520"

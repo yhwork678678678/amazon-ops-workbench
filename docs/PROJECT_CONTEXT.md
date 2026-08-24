@@ -29,28 +29,38 @@
 - 利润测算：输入售价、采购成本、物流、FBA 费用、广告花费、佣金比例，计算利润、利润率和 ROI。
 - 上架前检查：一组本地勾选项，用于 Listing 发布前快速复核。
 - 临时文件区：选择文件后保存到当前浏览器的 IndexedDB，可下载、删除。
+- 上传文件区：通过 Cloudflare Worker 把文件写入私密 GitHub 仓库 `amazon-ops-workbench-files`。
 - 备忘录：保存运营事项到当前浏览器的 localStorage，可新增、删除。
 
 明确不在当前版本内：
 
 - 登录系统。
-- 多设备同步。
-- 真正的云盘上传。
+- 完整云盘管理能力，例如云端删除、权限分组、分享链接和审计。
 - Amazon SP-API 授权和自动拉取销售数据。
 - 团队协作、权限管理、审计日志。
 
 ## 3. 重要边界
 
-GitHub Pages 只能托管静态文件，不能直接保存用户上传文件到服务器。因此当前文件区采用浏览器本地存储。
+GitHub Pages 只能托管静态文件，不能直接安全保存用户上传文件到 GitHub 私密仓库。因此当前文件区分为两类：
 
-这意味着：
+- 临时文件区：文件只在当前浏览器、当前设备可见，保存在 IndexedDB。
+- 上传文件区：前端把文件发给 Cloudflare Worker，Worker 使用 secret 中的 GitHub token 写入私密仓库 `amazon-ops-workbench-files`。
+
+临时文件区意味着：
 
 - 文件只在当前浏览器、当前设备可见。
 - 清理浏览器数据可能会删除文件和备忘。
 - 换电脑或换浏览器后不会同步。
 - 不会把文件上传到 GitHub，也不会进入 Git 历史。
 
-如果未来需要真正临时网盘，优先方案是：
+上传文件区意味着：
+
+- 文件会进入私密 GitHub 仓库和 Git 历史。
+- 前端不能保存 GitHub token，只能保存用户输入的上传密钥。
+- 上传密钥用于限制公开网页的上传入口，不能替代完整登录系统。
+- GitHub 仓库更适合低频小文件归档，不适合大文件或高频网盘。
+
+如果未来需要真正网盘，优先方案是：
 
 - Cloudflare R2 + Worker：适合低成本对象存储和分享链接。
 - Supabase Storage：适合带登录、数据库和文件存储的一体化方案。
@@ -108,6 +118,8 @@ D:\桌面\工作\工作台
 - `src/style.css`：完整视觉样式和响应式布局。
 - `src/main.tsx`：React 入口。
 - `vite.config.ts`：Vite 配置，当前使用 `base: './'`。
+- `worker/upload.js`：Cloudflare Worker 上传中转服务。
+- `wrangler.toml`：Worker 部署配置，不包含 secret。
 - `.github/workflows/deploy.yml`：GitHub Pages 自动部署。
 - `AGENTS.md`：给后续 Codex 会话的快速入口。
 - `README.md`：给用户和 GitHub 仓库首页看的简短说明。
@@ -182,7 +194,37 @@ IndexedDB: amazon-workbench-file-vault
 Object store: files
 ```
 
-### 7.3 利润测算 CalculatorState
+### 7.3 上传文件 UploadedFile
+
+```ts
+type UploadedFile = {
+  id: string
+  name: string
+  size: number
+  type: string
+  uploadedAt: string
+  path: string
+  htmlUrl?: string
+  commitUrl?: string
+  sha?: string
+}
+```
+
+存储位置：
+
+```text
+localStorage["amazon-workbench-uploaded-files"]
+localStorage["amazon-workbench-upload-key"]
+GitHub private repo: yhwork678678678/amazon-ops-workbench-files
+```
+
+上传链路：
+
+```text
+GitHub Pages 前端 -> Cloudflare Worker -> GitHub Contents API -> 私密文件仓库
+```
+
+### 7.4 利润测算 CalculatorState
 
 ```ts
 type CalculatorState = {
@@ -211,7 +253,7 @@ margin = profit / salePrice * 100
 roi = profit / (cost + shipping) * 100
 ```
 
-### 7.4 巡检流程 Workflow
+### 7.5 巡检流程 Workflow
 
 ```ts
 type Workflow = {
