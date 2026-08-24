@@ -23,6 +23,8 @@
 当前版本是静态前端 MVP，包含这些模块：
 
 - 概览：展示每日运营巡检流程。
+- 日常巡检流程支持在浏览器本地新增、编辑、删除和恢复默认。
+- 巡检流程和备忘录支持浏览器打开期间的时间提醒。
 - 常用工具：Seller Central、Amazon Ads、FBA Calculator、Keepa、Helium 10、Brand Analytics 等入口。
 - 利润测算：输入售价、采购成本、物流、FBA 费用、广告花费、佣金比例，计算利润、利润率和 ROI。
 - 上架前检查：一组本地勾选项，用于 Listing 发布前快速复核。
@@ -208,6 +210,29 @@ profit = salePrice - totalCost
 margin = profit / salePrice * 100
 roi = profit / (cost + shipping) * 100
 ```
+
+### 7.4 巡检流程 Workflow
+
+```ts
+type Workflow = {
+  id: string
+  time: string
+  title: string
+  body: string
+  reminderEnabled: boolean
+  reminderMinutes: number
+}
+```
+
+存储位置：
+
+```text
+localStorage["amazon-workbench-workflows"]
+```
+
+页面支持新增、编辑、删除和恢复默认流程。数据只保存在当前浏览器，不会上传到 GitHub。
+
+备忘录可选设置 `dueAt` 日期时间。页面每 30 秒检查一次到期项，在未来 24 小时内显示提醒；获得浏览器通知权限后，同时发送系统通知。网页完全关闭时不保证提醒。
 
 ## 8. 部署设计
 

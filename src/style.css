@@ -192,6 +192,27 @@ p {
   padding: 0 13px;
 }
 
+.reminder-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid #d7b36b;
+  border-radius: 8px;
+  background: #fff5d9;
+  color: #624713;
+  padding: 12px 14px;
+}
+
+.reminder-bar div {
+  display: grid;
+  gap: 2px;
+}
+
+.reminder-bar span {
+  color: #806735;
+  font-size: 13px;
+}
+
 .overview-grid,
 .split-grid {
   display: grid;
@@ -228,6 +249,52 @@ p {
   font-size: 20px;
 }
 
+.section-actions,
+.workflow-editor-heading,
+.workflow-editor-actions,
+.timeline-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-text-button,
+.icon-button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 9px;
+}
+
+.icon-button {
+  width: 34px;
+  padding: 0;
+}
+
+.icon-text-button:hover,
+.icon-button:hover {
+  border-color: var(--teal);
+  color: var(--teal);
+  background: var(--teal-soft);
+}
+
+.primary-button {
+  border-color: var(--ink);
+  color: var(--surface);
+  background: var(--ink);
+}
+
+.primary-button:hover {
+  color: var(--surface);
+  background: var(--teal);
+}
+
 .timeline {
   display: grid;
   border-top: 1px solid var(--line);
@@ -235,7 +302,7 @@ p {
 
 .timeline-row {
   display: grid;
-  grid-template-columns: 70px 140px minmax(0, 1fr);
+  grid-template-columns: 70px 140px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: baseline;
   border-bottom: 1px solid var(--line);
@@ -252,6 +319,99 @@ p {
 
 .timeline-row p {
   color: var(--muted);
+}
+
+.timeline-actions {
+  align-self: center;
+}
+
+.workflow-editor {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.workflow-editor-heading {
+  justify-content: space-between;
+}
+
+.workflow-editor-fields {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.workflow-editor-fields label {
+  display: grid;
+  gap: 6px;
+}
+
+.workflow-editor-fields span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.workflow-editor-fields input,
+.workflow-editor-fields textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fffefa;
+  color: var(--ink);
+  padding: 9px;
+}
+
+.workflow-body-field {
+  grid-column: 1 / -1;
+}
+
+.workflow-reminder-field {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+}
+
+.workflow-reminder-field > span,
+.note-due-field > span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.workflow-reminder-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toggle-row {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 7px;
+}
+
+.toggle-row input {
+  width: 16px;
+  height: 16px;
+}
+
+.workflow-reminder-controls select,
+.note-due-field input {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fffefa;
+  color: var(--ink);
+  padding: 8px 9px;
+}
+
+.workflow-editor-fields textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.workflow-editor-actions {
+  justify-content: flex-end;
 }
 
 .metric-card {
@@ -467,6 +627,16 @@ p {
   resize: vertical;
 }
 
+.note-due-field {
+  display: grid;
+  gap: 6px;
+}
+
+.note-due {
+  color: var(--amber);
+  font-size: 12px;
+}
+
 .note-card {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -560,6 +730,26 @@ p {
 
   .timeline-row {
     gap: 2px;
+    grid-template-columns: 1fr;
+  }
+
+  .timeline-actions {
+    justify-content: flex-start;
+    margin-top: 6px;
+  }
+
+  .workflow-editor-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-reminder-field,
+  .workflow-body-field {
+    grid-column: auto;
+  }
+
+  .workflow-reminder-controls {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .file-row {

@@ -1,6 +1,7 @@
 import {
   Activity,
   Archive,
+  Bell,
   Calculator,
   CheckCircle2,
   ClipboardList,
@@ -12,8 +13,10 @@ import {
   Link2,
   NotebookPen,
   PackageSearch,
+  Pencil,
   Plus,
   Search,
+  Save,
   Settings,
   ShieldCheck,
   Trash2,
@@ -29,6 +32,7 @@ type Note = {
   body: string
   tag: string
   createdAt: string
+  dueAt?: string
 }
 
 type StoredFile = {
@@ -49,9 +53,19 @@ type CalculatorState = {
   referralRate: number
 }
 
+type Workflow = {
+  id: string
+  time: string
+  title: string
+  body: string
+  reminderEnabled: boolean
+  reminderMinutes: number
+}
+
 const STORAGE_KEYS = {
   notes: 'amazon-workbench-notes',
   calculator: 'amazon-workbench-calculator',
+  workflows: 'amazon-workbench-workflows',
 }
 
 const defaultNotes: Note[] = [
@@ -110,11 +124,11 @@ const quickLinks = [
   },
 ]
 
-const workflows = [
-  ['09:30', '库存与断货风险', '检查 30 天销量、可售库存、在途和补货 ETA。'],
-  ['11:00', '广告预算巡检', '找花费突增、ACOS 失控、点击多无转化的活动。'],
-  ['14:30', 'Listing 质量', '检查差评、QA、图片、价格、coupon 和竞品变化。'],
-  ['17:30', '复盘记录', '把今天调整动作写进备忘，方便明天追踪结果。'],
+const defaultWorkflows: Workflow[] = [
+  { id: 'workflow-1', time: '09:30', title: '库存与断货风险', body: '检查 30 天销量、可售库存、在途和补货 ETA。', reminderEnabled: true, reminderMinutes: 10 },
+  { id: 'workflow-2', time: '11:00', title: '广告预算巡检', body: '找花费突增、ACOS 失控、点击多无转化的活动。', reminderEnabled: true, reminderMinutes: 10 },
+  { id: 'workflow-3', time: '14:30', title: 'Listing 质量', body: '检查差评、QA、图片、价格、coupon 和竞品变化。', reminderEnabled: true, reminderMinutes: 10 },
+  { id: 'workflow-4', time: '17:30', title: '复盘记录', body: '把今天调整动作写进备忘，方便明天追踪结果。', reminderEnabled: true, reminderMinutes: 10 },
 ]
 
 const defaultCalculator: CalculatorState = {
@@ -146,6 +160,24 @@ function readStoredCalculator() {
     return { ...defaultCalculator, ...(JSON.parse(raw) as Partial<CalculatorState>) }
   } catch {
     return defaultCalculator
+  }
+}
+
+function readStoredWorkflows() {
+  const raw = localStorage.getItem(STORAGE_KEYS.workflows)
+  if (!raw) return defaultWorkflows
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<Workflow>[]
+    return Array.isArray(parsed)
+      ? parsed.map((workflow) => ({
+          ...workflow,
+          reminderEnabled: workflow.reminderEnabled ?? true,
+          reminderMinutes: workflow.reminderMinutes ?? 10,
+        })) as Workflow[]
+      : defaultWorkflows
+  } catch {
+    return defaultWorkflows
   }
 }
 
@@ -225,11 +257,21 @@ function openExternal(href: string) {
 
 export function App() {
   const [notes, setNotes] = useState<Note[]>(readStoredNotes)
+  const [workflows, setWorkflows] = useState<Workflow[]>(readStoredWorkflows)
+  const [workflowEditorOpen, setWorkflowEditorOpen] = useState(false)
+  const [editingWorkflowId, setEditingWorkflowId] = useState<string | null>(null)
+  const [workflowDraft, setWorkflowDraft] = useState({ time: '', title: '', body: '', reminderEnabled: true, reminderMinutes: 10 })
   const [noteTitle, setNoteTitle] = useState('')
   const [noteBody, setNoteBody] = useState('')
   const [noteTag, setNoteTag] = useState('运营')
+  const [noteDueAt, setNoteDueAt] = useState('')
   const [files, setFiles] = useState<StoredFile[]>([])
   const [fileMessage, setFileMessage] = useState('文件只保存在当前浏览器，不会上传到 GitHub。')
+  const [clock, setClock] = useState(() => new Date())
+  const [reminderMessage, setReminderMessage] = useState('')
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() =>
+    'Notification' in window ? Notification.permission : 'unsupported',
+  )
   const [calculator, setCalculator] = useState<CalculatorState>(readStoredCalculator)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -240,6 +282,58 @@ export function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.calculator, JSON.stringify(calculator))
   }, [calculator])
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.workflows, JSON.stringify(workflows))
+  }, [workflows])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(new Date()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const pendingReminders = useMemo(() => {
+    const now = clock.getTime()
+    const end = now + 24 * 60 * 60 * 1000
+    const items: { id: string; title: string; dueAt: Date; source: string }[] = []
+
+    workflows.forEach((workflow) => {
+      if (!workflow.reminderEnabled) return
+      const [hour, minute] = workflow.time.split(':').map(Number)
+      if (!Number.isFinite(hour) || !Number.isFinite(minute)) return
+      const dueAt = new Date(clock)
+      dueAt.setHours(hour, minute, 0, 0)
+      if (dueAt.getTime() < now - 15 * 60 * 1000) dueAt.setDate(dueAt.getDate() + 1)
+      if (dueAt.getTime() <= end) items.push({ id: workflow.id, title: workflow.title, dueAt, source: '巡检' })
+    })
+
+    notes.forEach((note) => {
+      if (!note.dueAt) return
+      const dueAt = new Date(note.dueAt)
+      if (!Number.isNaN(dueAt.getTime()) && dueAt.getTime() <= end && dueAt.getTime() >= now - 15 * 60 * 1000) {
+        items.push({ id: note.id, title: note.title, dueAt, source: '备忘' })
+      }
+    })
+
+    return items.sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime())
+  }, [clock, notes, workflows])
+
+  useEffect(() => {
+    const now = clock.getTime()
+    pendingReminders.forEach((item) => {
+      const workflow = workflows.find((entry) => entry.id === item.id)
+      const reminderMinutes = workflow?.reminderMinutes ?? 0
+      const reminderAt = item.dueAt.getTime() - reminderMinutes * 60 * 1000
+      if (now < reminderAt || now > item.dueAt.getTime() + 15 * 60 * 1000) return
+
+      const reminderKey = `amazon-workbench-reminded:${item.id}:${item.dueAt.toISOString().slice(0, 10)}`
+      if (sessionStorage.getItem(reminderKey)) return
+      sessionStorage.setItem(reminderKey, '1')
+      const message = `${item.source}提醒：${item.title}`
+      setReminderMessage(message)
+      if (notificationPermission === 'granted') new Notification('亚马逊运营工作台', { body: message })
+    })
+  }, [clock, notes, notificationPermission, pendingReminders, workflows])
 
   useEffect(() => {
     getStoredFiles()
@@ -269,12 +363,70 @@ export function App() {
       body: noteBody.trim(),
       tag: noteTag.trim() || '运营',
       createdAt: new Date().toISOString(),
+      dueAt: noteDueAt || undefined,
     }
 
     setNotes((current) => [nextNote, ...current])
     setNoteTitle('')
     setNoteBody('')
     setNoteTag('运营')
+    setNoteDueAt('')
+  }
+
+  async function enableNotifications() {
+    if (!('Notification' in window)) return
+    const permission = await Notification.requestPermission()
+    setNotificationPermission(permission)
+  }
+
+  function openWorkflowEditor(workflow?: Workflow) {
+    setEditingWorkflowId(workflow?.id ?? null)
+    setWorkflowDraft(
+      workflow
+        ? { time: workflow.time, title: workflow.title, body: workflow.body, reminderEnabled: workflow.reminderEnabled, reminderMinutes: workflow.reminderMinutes }
+        : { time: '', title: '', body: '', reminderEnabled: true, reminderMinutes: 10 },
+    )
+    setWorkflowEditorOpen(true)
+  }
+
+  function closeWorkflowEditor() {
+    setWorkflowEditorOpen(false)
+    setEditingWorkflowId(null)
+    setWorkflowDraft({ time: '', title: '', body: '', reminderEnabled: true, reminderMinutes: 10 })
+  }
+
+  function handleWorkflowSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const time = workflowDraft.time.trim()
+    const title = workflowDraft.title.trim()
+    const body = workflowDraft.body.trim()
+    if (!time || !title || !body) return
+
+    const nextWorkflow: Workflow = {
+      id: editingWorkflowId ?? crypto.randomUUID(),
+      time,
+      title,
+      body,
+      reminderEnabled: workflowDraft.reminderEnabled,
+      reminderMinutes: workflowDraft.reminderMinutes,
+    }
+
+    setWorkflows((current) =>
+      editingWorkflowId
+        ? current.map((workflow) => (workflow.id === editingWorkflowId ? nextWorkflow : workflow))
+        : [...current, nextWorkflow],
+    )
+    closeWorkflowEditor()
+  }
+
+  function deleteWorkflow(id: string) {
+    setWorkflows((current) => current.filter((workflow) => workflow.id !== id))
+    if (editingWorkflowId === id) closeWorkflowEditor()
+  }
+
+  function restoreDefaultWorkflows() {
+    setWorkflows(defaultWorkflows)
+    closeWorkflowEditor()
   }
 
   async function handleFiles(fileList: FileList | null) {
@@ -358,8 +510,28 @@ export function App() {
               <FileUp size={16} />
               添加文件
             </button>
+            {notificationPermission === 'default' && (
+              <button type="button" onClick={() => void enableNotifications()}>
+                <Bell size={16} />
+                开启通知
+              </button>
+            )}
           </div>
         </header>
+
+        {(reminderMessage || pendingReminders.length > 0) && (
+          <section className="reminder-bar" aria-live="polite">
+            <Bell size={18} />
+            <div>
+              <strong>{reminderMessage || '即将到期事项'}</strong>
+              {pendingReminders.length > 0 && (
+                <span>
+                  {pendingReminders.slice(0, 3).map((item) => `${item.source}：${item.title}（${item.dueAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}）`).join('　')}
+                </span>
+              )}
+            </div>
+          </section>
+        )}
 
         <section className="overview-grid" id="overview" aria-label="运营概览">
           <article className="signal-card span-2">
@@ -368,17 +540,86 @@ export function App() {
                 <p className="eyebrow">Control loop</p>
                 <h3>日常巡检流程</h3>
               </div>
-              <Activity size={20} />
+              <div className="section-actions">
+                <button type="button" className="icon-text-button" onClick={() => openWorkflowEditor()}>
+                  <Plus size={16} />
+                  新增流程
+                </button>
+                <button type="button" className="icon-button" title="编辑巡检流程" onClick={() => setWorkflowEditorOpen((open) => !open)}>
+                  <Pencil size={17} />
+                </button>
+                <Activity size={20} />
+              </div>
             </div>
             <div className="timeline">
-              {workflows.map(([time, title, body]) => (
-                <div className="timeline-row" key={time}>
-                  <span>{time}</span>
-                  <strong>{title}</strong>
-                  <p>{body}</p>
+              {workflows.length === 0 ? (
+                <p className="empty-state">还没有巡检流程，请新增一条或恢复默认流程。</p>
+              ) : workflows.map((workflow) => (
+                <div className="timeline-row" key={workflow.id}>
+                  <span>{workflow.time}</span>
+                  <strong>{workflow.title}</strong>
+                  <p>{workflow.body}</p>
+                  {workflowEditorOpen && (
+                    <div className="timeline-actions">
+                      <button type="button" className="icon-button" title="编辑" onClick={() => openWorkflowEditor(workflow)}>
+                        <Pencil size={15} />
+                      </button>
+                      <button type="button" className="icon-button" title="删除" onClick={() => deleteWorkflow(workflow.id)}>
+                        <X size={15} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
+            {workflowEditorOpen && (
+              <form className="workflow-editor" onSubmit={handleWorkflowSubmit}>
+                <div className="workflow-editor-heading">
+                  <strong>{editingWorkflowId ? '编辑巡检流程' : '新增巡检流程'}</strong>
+                  <button type="button" className="icon-button" title="关闭编辑" onClick={closeWorkflowEditor}>
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="workflow-editor-fields">
+                  <label>
+                    <span>时间</span>
+                    <input type="text" placeholder="例如 09:30" value={workflowDraft.time} onChange={(event) => setWorkflowDraft((draft) => ({ ...draft, time: event.target.value }))} />
+                  </label>
+                  <label>
+                    <span>流程名称</span>
+                    <input type="text" placeholder="例如 库存与断货风险" value={workflowDraft.title} onChange={(event) => setWorkflowDraft((draft) => ({ ...draft, title: event.target.value }))} />
+                  </label>
+                  <label className="workflow-body-field">
+                    <span>检查说明</span>
+                    <textarea placeholder="写下这一步要检查的内容" value={workflowDraft.body} onChange={(event) => setWorkflowDraft((draft) => ({ ...draft, body: event.target.value }))} />
+                  </label>
+                  <div className="workflow-reminder-field">
+                    <span>提醒设置</span>
+                    <div className="workflow-reminder-controls">
+                      <label className="toggle-row">
+                        <input type="checkbox" checked={workflowDraft.reminderEnabled} onChange={(event) => setWorkflowDraft((draft) => ({ ...draft, reminderEnabled: event.target.checked }))} />
+                        <span>开启提醒</span>
+                      </label>
+                      <select value={workflowDraft.reminderMinutes} disabled={!workflowDraft.reminderEnabled} onChange={(event) => setWorkflowDraft((draft) => ({ ...draft, reminderMinutes: Number(event.target.value) }))}>
+                        <option value={0}>准时</option>
+                        <option value={5}>提前 5 分钟</option>
+                        <option value={10}>提前 10 分钟</option>
+                        <option value={30}>提前 30 分钟</option>
+                      </select>
+                    </div>
+                    </div>
+                  </div>
+                <div className="workflow-editor-actions">
+                  <button type="submit" className="icon-text-button primary-button">
+                    <Save size={16} />
+                    保存流程
+                  </button>
+                  <button type="button" className="icon-text-button" onClick={restoreDefaultWorkflows}>
+                    恢复默认
+                  </button>
+                </div>
+              </form>
+            )}
           </article>
 
           <article className="signal-card metric-card">
@@ -566,6 +807,10 @@ export function App() {
                 value={noteBody}
                 onChange={(event) => setNoteBody(event.target.value)}
               />
+              <label className="note-due-field">
+                <span>提醒时间（可选）</span>
+                <input type="datetime-local" value={noteDueAt} onChange={(event) => setNoteDueAt(event.target.value)} />
+              </label>
               <button type="submit">
                 <Plus size={16} />
                 新增备忘
@@ -587,6 +832,7 @@ export function App() {
                   </div>
                   <strong>{note.title}</strong>
                   <p>{note.body}</p>
+                  {note.dueAt && <small className="note-due">提醒：{new Date(note.dueAt).toLocaleString('zh-CN')}</small>}
                 </article>
               ))}
             </div>
