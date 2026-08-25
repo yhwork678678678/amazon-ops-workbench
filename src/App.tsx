@@ -18,8 +18,6 @@ import {
   Save,
   Settings,
   ShieldCheck,
-  Trash2,
-  UploadCloud,
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -32,15 +30,6 @@ type Note = {
   tag: string
   createdAt: string
   dueAt?: string
-}
-
-type StoredFile = {
-  id: string
-  name: string
-  size: number
-  type: string
-  addedAt: string
-  blob: Blob
 }
 
 type UploadedFile = {
@@ -180,69 +169,6 @@ function readStoredWorkflows() {
   }
 }
 
-function openFileDatabase() {
-  return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open('amazon-workbench-file-vault', 1)
-
-    request.onupgradeneeded = () => {
-      const db = request.result
-      if (!db.objectStoreNames.contains('files')) {
-        db.createObjectStore('files', { keyPath: 'id' })
-      }
-    }
-
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
-  })
-}
-
-async function getStoredFiles() {
-  const db = await openFileDatabase()
-  return new Promise<StoredFile[]>((resolve, reject) => {
-    const transaction = db.transaction('files', 'readonly')
-    const request = transaction.objectStore('files').getAll()
-
-    request.onsuccess = () => resolve(request.result as StoredFile[])
-    request.onerror = () => reject(request.error)
-    transaction.oncomplete = () => db.close()
-  })
-}
-
-async function putStoredFile(file: File) {
-  const db = await openFileDatabase()
-  return new Promise<void>((resolve, reject) => {
-    const transaction = db.transaction('files', 'readwrite')
-    const storedFile: StoredFile = {
-      id: crypto.randomUUID(),
-      name: file.name,
-      size: file.size,
-      type: file.type || 'application/octet-stream',
-      addedAt: new Date().toISOString(),
-      blob: file,
-    }
-
-    transaction.objectStore('files').put(storedFile)
-    transaction.oncomplete = () => {
-      db.close()
-      resolve()
-    }
-    transaction.onerror = () => reject(transaction.error)
-  })
-}
-
-async function removeStoredFile(id: string) {
-  const db = await openFileDatabase()
-  return new Promise<void>((resolve, reject) => {
-    const transaction = db.transaction('files', 'readwrite')
-    transaction.objectStore('files').delete(id)
-    transaction.oncomplete = () => {
-      db.close()
-      resolve()
-    }
-    transaction.onerror = () => reject(transaction.error)
-  })
-}
-
 function formatBytes(bytes: number) {
   if (bytes === 0) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB']
@@ -260,8 +186,6 @@ export function App() {
   const [noteBody, setNoteBody] = useState('')
   const [noteTag, setNoteTag] = useState('运营')
   const [noteDueAt, setNoteDueAt] = useState('')
-  const [files, setFiles] = useState<StoredFile[]>([])
-  const [fileMessage, setFileMessage] = useState('文件只保存在当前浏览器，不会上传到 GitHub。')
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>(readStoredUploadedFiles)
   const [uploadKey, setUploadKey] = useState(readStoredUploadKey)
   const [cloudFileMessage, setCloudFileMessage] = useState(
@@ -276,7 +200,6 @@ export function App() {
     'Notification' in window ? Notification.permission : 'unsupported',
   )
   const [calculator, setCalculator] = useState<CalculatorState>(readStoredCalculator)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const cloudFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -350,12 +273,6 @@ export function App() {
       if (notificationPermission === 'granted') new Notification('亚马逊运营工作台', { body: message })
     })
   }, [clock, notes, notificationPermission, pendingReminders, workflows])
-
-  useEffect(() => {
-    getStoredFiles()
-      .then((items) => setFiles(items.sort((a, b) => b.addedAt.localeCompare(a.addedAt))))
-      .catch(() => setFileMessage('当前浏览器不支持本地文件库，上传区暂不可用。'))
-  }, [])
 
   const financials = useMemo(() => {
     const referralFee = calculator.salePrice * (calculator.referralRate / 100)
@@ -443,17 +360,6 @@ export function App() {
   function restoreDefaultWorkflows() {
     setWorkflows(defaultWorkflows)
     closeWorkflowEditor()
-  }
-
-  async function handleFiles(fileList: FileList | null) {
-    if (!fileList?.length) return
-
-    setFileMessage('正在写入浏览器本地文件库...')
-    await Promise.all(Array.from(fileList).map((file) => putStoredFile(file)))
-    const nextFiles = await getStoredFiles()
-    setFiles(nextFiles.sort((a, b) => b.addedAt.localeCompare(a.addedAt)))
-    setFileMessage(`${fileList.length} 个文件已保存到当前浏览器。`)
-    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   async function uploadCloudFile(file: File) {
@@ -589,21 +495,6 @@ export function App() {
     setPreviewFile(null)
   }
 
-  function downloadFile(file: StoredFile) {
-    const url = URL.createObjectURL(file.blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = file.name
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-
-  async function deleteFile(id: string) {
-    await removeStoredFile(id)
-    setFiles((current) => current.filter((file) => file.id !== id))
-    setFileMessage('文件已从当前浏览器移除。')
-  }
-
   return (
     <main className="shell">
       <aside className="sidebar" aria-label="工作台导航">
@@ -644,7 +535,7 @@ export function App() {
         <header className="topbar">
           <div>
             <p className="eyebrow">Daily operating desk</p>
-            <h2>今天的重点和临时资料都放在一个页面里。</h2>
+            <h2>今天的重点和文件资料都放在一个页面里。</h2>
           </div>
           <div className="topbar-actions">
             {notificationPermission === 'default' && (
@@ -760,12 +651,6 @@ export function App() {
           </article>
 
           <article className="signal-card metric-card">
-            <p className="eyebrow">Files</p>
-            <strong>{files.length}</strong>
-            <span>本地临时文件</span>
-          </article>
-
-          <article className="signal-card metric-card">
             <p className="eyebrow">Notes</p>
             <strong>{notes.length}</strong>
             <span>运营备忘</span>
@@ -847,53 +732,6 @@ export function App() {
         </section>
 
         <section className="file-workspace" id="files">
-          <article className="panel">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Local vault</p>
-                <h3>临时文件区</h3>
-              </div>
-              <UploadCloud size={20} />
-            </div>
-
-            <input
-              className="sr-only"
-              ref={fileInputRef}
-              type="file"
-              multiple
-              onChange={(event) => void handleFiles(event.target.files)}
-            />
-            <button className="upload-zone" type="button" onClick={() => fileInputRef.current?.click()}>
-              <UploadCloud size={24} />
-              <span>选择文件保存到当前浏览器</span>
-              <small>{fileMessage}</small>
-            </button>
-
-            <div className="file-list">
-              {files.length === 0 ? (
-                <p className="empty-state">还没有文件。适合临时放广告报表、竞品截图、Listing 草稿。</p>
-              ) : (
-                files.map((file) => (
-                  <div className="file-row" key={file.id}>
-                    <FileText size={18} />
-                    <div>
-                      <strong>{file.name}</strong>
-                      <span>
-                        {formatBytes(file.size)} · {new Date(file.addedAt).toLocaleString('zh-CN')}
-                      </span>
-                    </div>
-                    <button type="button" title="下载" onClick={() => downloadFile(file)}>
-                      <Download size={16} />
-                    </button>
-                    <button type="button" title="删除" onClick={() => void deleteFile(file.id)}>
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </article>
-
           <article className="panel">
             <div className="section-heading">
               <div>

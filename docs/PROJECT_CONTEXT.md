@@ -27,7 +27,6 @@
 - 巡检流程和备忘录支持浏览器打开期间的时间提醒。
 - 利润测算：输入售价、采购成本、物流、FBA 费用、广告花费、佣金比例，计算利润、利润率和 ROI。
 - 上架前检查：一组本地勾选项，用于 Listing 发布前快速复核。
-- 临时文件区：选择文件后保存到当前浏览器的 IndexedDB，可下载、删除。
 - 上传文件区：通过 Cloudflare Worker 把文件写入私密 GitHub 仓库 `amazon-ops-workbench-files`。
 - 上传文件区支持从私密仓库刷新列表，并通过 Worker 代理预览和下载。
 - 备忘录：保存运营事项到当前浏览器的 localStorage，可新增、删除。
@@ -43,15 +42,7 @@
 
 GitHub Pages 只能托管静态文件，不能直接安全保存用户上传文件到 GitHub 私密仓库。因此当前文件区分为两类：
 
-- 临时文件区：文件只在当前浏览器、当前设备可见，保存在 IndexedDB。
 - 上传文件区：前端把文件发给 Cloudflare Worker，Worker 使用 secret 中的 GitHub token 写入私密仓库 `amazon-ops-workbench-files`。
-
-临时文件区意味着：
-
-- 文件只在当前浏览器、当前设备可见。
-- 清理浏览器数据可能会删除文件和备忘。
-- 换电脑或换浏览器后不会同步。
-- 不会把文件上传到 GitHub，也不会进入 Git 历史。
 
 上传文件区意味着：
 
@@ -174,27 +165,7 @@ type Note = {
 localStorage["amazon-workbench-notes"]
 ```
 
-### 7.2 临时文件 StoredFile
-
-```ts
-type StoredFile = {
-  id: string
-  name: string
-  size: number
-  type: string
-  addedAt: string
-  blob: Blob
-}
-```
-
-存储位置：
-
-```text
-IndexedDB: amazon-workbench-file-vault
-Object store: files
-```
-
-### 7.3 上传文件 UploadedFile
+### 7.2 上传文件 UploadedFile
 
 ```ts
 type UploadedFile = {
@@ -230,7 +201,7 @@ GitHub Pages 前端 -> Cloudflare Worker -> GitHub Contents API -> 私密文件�
 GitHub Pages 前端 -> Cloudflare Worker -> GitHub Git Trees / Contents API -> 文件列表、预览或下载
 ```
 
-### 7.4 利润测算 CalculatorState
+### 7.3 利润测算 CalculatorState
 
 ```ts
 type CalculatorState = {
@@ -259,7 +230,7 @@ margin = profit / salePrice * 100
 roi = profit / (cost + shipping) * 100
 ```
 
-### 7.5 巡检流程 Workflow
+### 7.4 巡检流程 Workflow
 
 ```ts
 type Workflow = {

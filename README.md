@@ -1,6 +1,6 @@
 # 亚马逊运营工作台
 
-一个可部署到 GitHub Pages 的个人亚马逊运营工作台。当前版本包含利润测算、上架检查、浏览器本地临时文件区、私密 GitHub 上传文件区和运营备忘录。
+一个可部署到 GitHub Pages 的个人亚马逊运营工作台。当前版本包含利润测算、上架检查、私密 GitHub 上传文件区和运营备忘录。
 
 ## 本地运行
 
@@ -38,7 +38,6 @@ VITE_UPLOAD_WORKER_URL=https://your-worker.your-subdomain.workers.dev
 ## 数据说明
 
 - 备忘录保存在当前浏览器的 `localStorage`。
-- 临时文件保存在当前浏览器的 `IndexedDB`。
 - 上传文件通过 Cloudflare Worker 写入私密仓库 `amazon-ops-workbench-files`。
 - 上传文件区可以刷新私密仓库文件列表、预览图片/PDF/文本/音视频，并下载文件。
 - 上传密钥保存在当前浏览器的 `localStorage`，不要把密钥发给无关人员。
