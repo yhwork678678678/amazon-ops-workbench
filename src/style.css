@@ -72,13 +72,11 @@ p {
   top: 0;
   height: 100vh;
   border-right: 1px solid var(--line);
-  background:
-    linear-gradient(180deg, rgba(255, 253, 248, 0.94), rgba(235, 230, 219, 0.9)),
-    repeating-linear-gradient(90deg, transparent 0 19px, rgba(23, 22, 17, 0.035) 20px);
+  background: var(--surface);
   display: flex;
   flex-direction: column;
-  gap: 26px;
-  padding: 24px;
+  gap: 30px;
+  padding: 28px 20px;
 }
 
 .brand-block {
@@ -101,24 +99,31 @@ p {
 
 .nav-list {
   display: grid;
-  gap: 8px;
+  gap: 4px;
 }
 
 .nav-list a {
   color: var(--ink);
   text-decoration: none;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 5px;
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 42px;
-  padding: 0 12px;
+  min-height: 40px;
+  padding: 0 10px;
+  font-size: 15px;
 }
 
 .nav-list a:hover {
-  background: rgba(255, 253, 248, 0.7);
+  background: var(--paper);
   border-color: var(--line);
+}
+
+.nav-list a.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--surface);
 }
 
 .workspace {
@@ -133,11 +138,7 @@ p {
   justify-content: space-between;
   align-items: flex-start;
   gap: 18px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  padding: 20px;
+  min-height: 40px;
 }
 
 .topbar h2 {

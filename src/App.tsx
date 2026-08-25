@@ -195,6 +195,7 @@ export function App() {
   const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null)
   const [clock, setClock] = useState(() => new Date())
   const [reminderMessage, setReminderMessage] = useState('')
+  const [activeSection, setActiveSection] = useState('notes')
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() =>
     'Notification' in window ? Notification.permission : 'unsupported',
   )
@@ -228,6 +229,27 @@ export function App() {
   useEffect(() => {
     const timer = window.setInterval(() => setClock(new Date()), 30_000)
     return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    const sectionIds = ['notes', 'overview', 'calculator', 'files']
+    const sections = sectionIds
+      .map((id) => document.getElementById(id))
+      .filter((section): section is HTMLElement => section !== null)
+    if (!sections.length) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((left, right) => right.intersectionRatio - left.intersectionRatio)
+        if (visible[0]) setActiveSection(visible[0].target.id)
+      },
+      { rootMargin: '-18% 0px -62% 0px', threshold: [0, 0.2, 0.5] },
+    )
+
+    sections.forEach((section) => observer.observe(section))
+    return () => observer.disconnect()
   }, [])
 
   const pendingReminders = useMemo(() => {
@@ -506,21 +528,21 @@ export function App() {
         </div>
 
         <nav className="nav-list">
-          <a href="#overview">
+          <a className={activeSection === 'notes' ? 'active' : ''} href="#notes" onClick={() => setActiveSection('notes')}>
+            <NotebookPen size={18} />
+            备忘录
+          </a>
+          <a className={activeSection === 'overview' ? 'active' : ''} href="#overview" onClick={() => setActiveSection('overview')}>
             <LayoutDashboard size={18} />
             概览
           </a>
-          <a href="#calculator">
+          <a className={activeSection === 'calculator' ? 'active' : ''} href="#calculator" onClick={() => setActiveSection('calculator')}>
             <Calculator size={18} />
             利润测算
           </a>
-          <a href="#files">
+          <a className={activeSection === 'files' ? 'active' : ''} href="#files" onClick={() => setActiveSection('files')}>
             <Archive size={18} />
             文件区
-          </a>
-          <a href="#notes">
-            <NotebookPen size={18} />
-            备忘录
           </a>
         </nav>
 
