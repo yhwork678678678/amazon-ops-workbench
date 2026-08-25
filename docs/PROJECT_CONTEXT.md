@@ -44,6 +44,12 @@ GitHub Pages 只能托管静态文件，不能直接安全保存用户上传文�
 
 - 上传文件区：前端把文件发给 Cloudflare Worker，Worker 使用 secret 中的 GitHub token 写入私密仓库 `amazon-ops-workbench-files`。
 
+上传文件命名规则：
+
+- 新上传文件名使用 `YYYY-MM-DD-原文件名` 格式。
+- 仓库路径按月份和日期分目录，例如 `uploads/2026-08/25/2026-08-25-report.xlsx`。
+- 修改命名规则不会自动改名历史文件。
+
 上传文件区意味着：
 
 - 文件会进入私密 GitHub 仓库和 Git 历史。

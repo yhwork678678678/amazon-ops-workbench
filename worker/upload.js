@@ -103,11 +103,9 @@ function buildUploadPath(env, originalName) {
   const year = now.getUTCFullYear()
   const month = String(now.getUTCMonth() + 1).padStart(2, '0')
   const day = String(now.getUTCDate()).padStart(2, '0')
-  const stamp = now.toISOString().replace(/[:.]/g, '-')
   const safeName = sanitizeFileName(originalName)
-  const id = crypto.randomUUID().slice(0, 8)
 
-  return `${env.UPLOAD_DIR}/${year}-${month}/${day}/${stamp}-${id}-${safeName}`
+  return `${env.UPLOAD_DIR}/${year}-${month}/${day}/${year}-${month}-${day}-${safeName}`
 }
 
 async function uploadToGitHub(env, file, content) {
