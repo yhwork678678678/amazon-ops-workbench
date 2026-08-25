@@ -532,10 +532,6 @@ export function App() {
 
       <section className="workspace">
         <header className="topbar">
-          <div>
-            <p className="eyebrow">Daily operating desk</p>
-            <h2>今天的重点和文件资料都放在一个页面里。</h2>
-          </div>
           <div className="topbar-actions">
             {notificationPermission === 'default' && (
               <button type="button" onClick={() => void enableNotifications()}>
@@ -806,7 +802,7 @@ export function App() {
           </article>
         </section>
 
-        <section className="split-grid">
+        <section className="split-grid notes-section">
           <article className="panel" id="notes">
             <div className="section-heading">
               <div>

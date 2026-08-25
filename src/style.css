@@ -213,6 +213,26 @@ p {
   grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
 }
 
+.notes-section {
+  order: 1;
+}
+
+.overview-grid {
+  order: 2;
+}
+
+.workspace > .split-grid:not(.notes-section) {
+  order: 3;
+}
+
+.file-workspace {
+  order: 4;
+}
+
+.footer-note {
+  order: 5;
+}
+
 .file-workspace {
   grid-template-columns: minmax(0, 1fr);
 }
