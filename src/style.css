@@ -200,6 +200,12 @@ p {
   grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
 }
 
+.overview-grid,
+.workspace > .split-grid:not(.notes-section),
+.notes-section {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .notes-section {
   order: 1;
 }
@@ -231,10 +237,6 @@ p {
   background: var(--surface);
   padding: 18px;
   box-shadow: var(--shadow);
-}
-
-.span-2 {
-  grid-column: span 2;
 }
 
 .section-heading {
@@ -414,22 +416,6 @@ p {
   justify-content: flex-end;
 }
 
-.metric-card {
-  display: grid;
-  align-content: space-between;
-  min-height: 180px;
-}
-
-.metric-card strong {
-  font-family: var(--mono);
-  font-size: 54px;
-  line-height: 1;
-}
-
-.metric-card span {
-  color: var(--muted);
-}
-
 .tool-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -527,33 +513,6 @@ p {
 
 .negative {
   color: var(--red);
-}
-
-.compact-panel {
-  align-self: start;
-}
-
-.check-row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-top: 1px solid var(--line);
-  min-height: 44px;
-  color: var(--muted);
-}
-
-.check-row input {
-  position: absolute;
-  opacity: 0;
-}
-
-.check-row svg {
-  color: var(--line);
-}
-
-.check-row input:checked + svg {
-  color: var(--teal);
 }
 
 .sr-only {
@@ -814,9 +773,6 @@ p {
     grid-template-columns: 1fr;
   }
 
-  .span-2 {
-    grid-column: auto;
-  }
 }
 
 @media (max-width: 760px) {

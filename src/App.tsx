@@ -3,8 +3,6 @@ import {
   Archive,
   Bell,
   Calculator,
-  CheckCircle2,
-  ClipboardList,
   Download,
   ExternalLink,
   FileText,
@@ -575,7 +573,7 @@ export function App() {
         )}
 
         <section className="overview-grid" id="overview" aria-label="运营概览">
-          <article className="signal-card span-2">
+          <article className="signal-card">
             <div className="section-heading">
               <div>
                 <p className="eyebrow">Control loop</p>
@@ -663,11 +661,6 @@ export function App() {
             )}
           </article>
 
-          <article className="signal-card metric-card">
-            <p className="eyebrow">Notes</p>
-            <strong>{notes.length}</strong>
-            <span>运营备忘</span>
-          </article>
         </section>
 
         <section className="split-grid">
@@ -724,24 +717,6 @@ export function App() {
             </div>
           </article>
 
-          <article className="panel compact-panel">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Checklist</p>
-                <h3>上架前检查</h3>
-              </div>
-              <ClipboardList size={20} />
-            </div>
-            {['主图是否清晰', '标题是否覆盖核心词', '五点是否写出利益点', '价格/coupon 是否同步', 'FBA 库存是否够 30 天'].map(
-              (item) => (
-                <label className="check-row" key={item}>
-                  <input type="checkbox" />
-                  <CheckCircle2 size={17} />
-                  <span>{item}</span>
-                </label>
-              ),
-            )}
-          </article>
         </section>
 
         <section className="file-workspace" id="files">
