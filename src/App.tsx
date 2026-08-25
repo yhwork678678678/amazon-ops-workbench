@@ -17,7 +17,6 @@ import {
   Search,
   Save,
   Settings,
-  ShieldCheck,
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -529,10 +528,6 @@ export function App() {
           </a>
         </nav>
 
-        <div className="privacy-note">
-          <ShieldCheck size={18} />
-          <span>静态网页优先，本地数据优先；运营文件默认不离开浏览器。</span>
-        </div>
       </aside>
 
       <section className="workspace">

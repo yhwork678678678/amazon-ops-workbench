@@ -135,18 +135,6 @@ p {
   border-color: var(--line);
 }
 
-.privacy-note {
-  margin-top: auto;
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 12px;
-  font-size: 13px;
-}
-
 .workspace {
   min-width: 0;
   padding: 24px;
@@ -811,10 +799,6 @@ p {
 
   .nav-list {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .privacy-note {
-    margin-top: 0;
   }
 
   .overview-grid,
