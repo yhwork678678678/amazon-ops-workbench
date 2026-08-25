@@ -77,26 +77,7 @@
 即将到期事项
 ```
 
-### 3.2 常用工具
-
-当前工具入口：
-
-| 名称 | 链接 | 用途 | 分组 |
-| --- | --- | --- | --- |
-| Seller Central | `https://sellercentral.amazon.com/` | 后台、订单、库存、广告入口 | 核心 |
-| Amazon Ads | `https://advertising.amazon.com/` | 广告活动和报表 | 广告 |
-| FBA Revenue Calculator | `https://sell.amazon.com/tools/fba-revenue-calculator` | 官方 FBA 收益估算 | 利润 |
-| Keepa | `https://keepa.com/` | 价格历史和竞品跟踪 | 竞品 |
-| Helium 10 | `https://www.helium10.com/` | 关键词、Listing、竞品工具 | 选品 |
-| Brand Analytics | `https://sellercentral.amazon.com/brand-analytics` | 品牌关键词与市场篮子分析 | 品牌 |
-
-维护建议：
-
-- 后续应改成可编辑工具列表。
-- 可以按“广告、选品、竞品、财务、库存、客服”分组。
-- 外部链接必须使用 `noopener,noreferrer`。
-
-### 3.3 利润测算
+### 3.2 利润测算
 
 输入项：
 

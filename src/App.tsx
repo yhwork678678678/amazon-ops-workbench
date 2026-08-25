@@ -10,7 +10,6 @@ import {
   FileText,
   FileUp,
   LayoutDashboard,
-  Link2,
   NotebookPen,
   PackageSearch,
   Pencil,
@@ -105,45 +104,6 @@ const defaultNotes: Note[] = [
     body: '主图、五点、A+、QA、coupon、库存、配送时效逐项过一遍。',
     tag: 'Listing',
     createdAt: new Date().toISOString(),
-  },
-]
-
-const quickLinks = [
-  {
-    title: 'Seller Central',
-    desc: '后台、订单、库存、广告入口',
-    href: 'https://sellercentral.amazon.com/',
-    group: '核心',
-  },
-  {
-    title: 'Amazon Ads',
-    desc: '广告活动和报表',
-    href: 'https://advertising.amazon.com/',
-    group: '广告',
-  },
-  {
-    title: 'FBA Revenue Calculator',
-    desc: '官方 FBA 收益估算',
-    href: 'https://sell.amazon.com/tools/fba-revenue-calculator',
-    group: '利润',
-  },
-  {
-    title: 'Keepa',
-    desc: '价格历史和竞品跟踪',
-    href: 'https://keepa.com/',
-    group: '竞品',
-  },
-  {
-    title: 'Helium 10',
-    desc: '关键词、Listing、竞品工具',
-    href: 'https://www.helium10.com/',
-    group: '选品',
-  },
-  {
-    title: 'Brand Analytics',
-    desc: '品牌关键词与市场篮子分析',
-    href: 'https://sellercentral.amazon.com/brand-analytics',
-    group: '品牌',
   },
 ]
 
@@ -288,10 +248,6 @@ function formatBytes(bytes: number) {
   const units = ['B', 'KB', 'MB', 'GB']
   const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
   return `${(bytes / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`
-}
-
-function openExternal(href: string) {
-  window.open(href, '_blank', 'noopener,noreferrer')
 }
 
 export function App() {
@@ -664,10 +620,6 @@ export function App() {
             <LayoutDashboard size={18} />
             概览
           </a>
-          <a href="#tools">
-            <Link2 size={18} />
-            常用工具
-          </a>
           <a href="#calculator">
             <Calculator size={18} />
             利润测算
@@ -692,17 +644,9 @@ export function App() {
         <header className="topbar">
           <div>
             <p className="eyebrow">Daily operating desk</p>
-            <h2>今天的重点、工具和临时资料都放在一个页面里。</h2>
+            <h2>今天的重点和临时资料都放在一个页面里。</h2>
           </div>
           <div className="topbar-actions">
-            <button type="button" onClick={() => openExternal('https://sellercentral.amazon.com/')}>
-              <ExternalLink size={16} />
-              打开后台
-            </button>
-            <button type="button" onClick={() => fileInputRef.current?.click()}>
-              <FileUp size={16} />
-              添加临时文件
-            </button>
             {notificationPermission === 'default' && (
               <button type="button" onClick={() => void enableNotifications()}>
                 <Bell size={16} />
@@ -826,26 +770,6 @@ export function App() {
             <strong>{notes.length}</strong>
             <span>运营备忘</span>
           </article>
-        </section>
-
-        <section className="panel" id="tools">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Tool bay</p>
-              <h3>亚马逊运营常用入口</h3>
-            </div>
-            <Search size={20} />
-          </div>
-          <div className="tool-grid">
-            {quickLinks.map((tool) => (
-              <button className="tool-tile" type="button" key={tool.href} onClick={() => openExternal(tool.href)}>
-                <span className="tool-group">{tool.group}</span>
-                <strong>{tool.title}</strong>
-                <small>{tool.desc}</small>
-                <ExternalLink size={16} />
-              </button>
-            ))}
-          </div>
         </section>
 
         <section className="split-grid">
