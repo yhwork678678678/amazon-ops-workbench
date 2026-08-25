@@ -495,6 +495,10 @@ export function App() {
     setPreviewFile(null)
   }
 
+  useEffect(() => {
+    if (uploadKey.trim()) void refreshUploadedFiles()
+  }, [])
+
   return (
     <main className="shell">
       <aside className="sidebar" aria-label="工作台导航">
@@ -780,7 +784,7 @@ export function App() {
 
             <div className="file-list">
               {uploadedFiles.length === 0 ? (
-                <p className="empty-state">还没有上传记录。适合保存需要换电脑也能找回的运营文件。</p>
+                <p className="empty-state">暂无文件。填写上传密钥后点击刷新，即可读取私密仓库中的文件。</p>
               ) : (
                 uploadedFiles.map((file) => (
                   <div className="file-row cloud-file-row" key={file.id}>
