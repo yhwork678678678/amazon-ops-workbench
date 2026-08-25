@@ -40,6 +40,7 @@ dist/ 构建产物生成成功
 - 临时文件继续保存在当前浏览器 IndexedDB。
 - 上传文件区通过 Cloudflare Worker 写入私密 GitHub 仓库。
 - 新增 Worker 部署配置和上传密钥机制，避免前端暴露 GitHub token。
+- 上传文件区支持从私密仓库刷新列表、预览和下载。
 
 ### v0.1.3 - 巡检和备忘提醒
 

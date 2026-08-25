@@ -112,6 +112,8 @@
 - 需要输入上传密钥后才能选择文件上传。
 - 前端调用 Cloudflare Worker，Worker 使用 secret 中的 GitHub token 写入私密仓库。
 - 上传成功后展示文件名、大小、上传时间、仓库路径和 GitHub 查看入口。
+- 支持从私密仓库刷新文件列表。
+- 支持通过 Worker 代理预览和下载文件，不直接暴露 GitHub 私密仓库内容地址。
 - GitHub token 不进入前端代码、localStorage 或仓库文件。
 
 备忘录：

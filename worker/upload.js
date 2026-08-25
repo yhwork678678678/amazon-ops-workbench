@@ -2,6 +2,26 @@ const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
 }
 
+const MIME_TYPES = {
+  '.csv': 'text/csv',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.gif': 'image/gif',
+  '.jpeg': 'image/jpeg',
+  '.jpg': 'image/jpeg',
+  '.json': 'application/json',
+  '.mp3': 'audio/mpeg',
+  '.mp4': 'video/mp4',
+  '.pdf': 'application/pdf',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.txt': 'text/plain',
+  '.webm': 'video/webm',
+  '.webp': 'image/webp',
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+}
+
 function corsHeaders(request, env) {
   const origin = request.headers.get('origin') || ''
   const allowedOrigins = new Set([
@@ -12,7 +32,7 @@ function corsHeaders(request, env) {
 
   return {
     'access-control-allow-origin': allowedOrigins.has(origin) ? origin : env.ALLOWED_ORIGIN,
-    'access-control-allow-methods': 'POST, OPTIONS',
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
     'access-control-allow-headers': 'content-type, x-upload-key',
     'access-control-max-age': '86400',
     vary: 'Origin',
@@ -50,6 +70,34 @@ function toBase64(arrayBuffer) {
   return btoa(binary)
 }
 
+function fromBase64(value) {
+  const binary = atob(value.replace(/\s/g, ''))
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+  return bytes
+}
+
+function fileTypeFromPath(path) {
+  const dotIndex = path.lastIndexOf('.')
+  const extension = dotIndex >= 0 ? path.slice(dotIndex).toLowerCase() : ''
+  return MIME_TYPES[extension] || 'application/octet-stream'
+}
+
+function isSafeUploadPath(path, env) {
+  return path.startsWith(`${env.UPLOAD_DIR}/`) && !path.includes('..') && !path.includes('\\')
+}
+
+function githubHeaders(env, accept = 'application/vnd.github+json') {
+  return {
+    authorization: `Bearer ${env.GITHUB_TOKEN}`,
+    accept,
+    'user-agent': 'amazon-ops-workbench-upload-worker',
+    'x-github-api-version': '2022-11-28',
+  }
+}
+
 function buildUploadPath(env, originalName) {
   const now = new Date()
   const year = now.getUTCFullYear()
@@ -68,11 +116,8 @@ async function uploadToGitHub(env, file, content) {
   const response = await fetch(endpoint, {
     method: 'PUT',
     headers: {
-      authorization: `Bearer ${env.GITHUB_TOKEN}`,
-      accept: 'application/vnd.github+json',
+      ...githubHeaders(env),
       'content-type': 'application/json',
-      'user-agent': 'amazon-ops-workbench-upload-worker',
-      'x-github-api-version': '2022-11-28',
     },
     body: JSON.stringify({
       branch: env.GITHUB_BRANCH,
@@ -99,14 +144,68 @@ async function uploadToGitHub(env, file, content) {
   }
 }
 
+async function listGitHubFiles(env) {
+  const endpoint = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/git/trees/${encodeURIComponent(env.GITHUB_BRANCH)}?recursive=1`
+  const response = await fetch(endpoint, { headers: githubHeaders(env) })
+  const result = await response.json()
+
+  if (!response.ok) {
+    return { ok: false, status: response.status, message: result?.message || 'Unable to list files.' }
+  }
+
+  const files = (result.tree || [])
+    .filter((entry) => entry.type === 'blob' && isSafeUploadPath(entry.path, env))
+    .map((entry) => ({
+      name: entry.path.split('/').pop() || entry.path,
+      path: entry.path,
+      size: entry.size || 0,
+      type: fileTypeFromPath(entry.path),
+      uploadedAt: null,
+      sha: entry.sha,
+    }))
+    .sort((left, right) => right.path.localeCompare(left.path))
+
+  return { ok: true, files }
+}
+
+async function getGitHubFile(env, path) {
+  if (!isSafeUploadPath(path, env)) {
+    return { ok: false, status: 400, message: 'Invalid file path.' }
+  }
+
+  const endpoint = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURIComponent(path).replace(/%2F/g, '/')}?ref=${encodeURIComponent(env.GITHUB_BRANCH)}`
+  const response = await fetch(endpoint, { headers: githubHeaders(env) })
+  const result = await response.json()
+
+  if (!response.ok || result.type !== 'file' || typeof result.content !== 'string') {
+    return { ok: false, status: response.status || 404, message: result?.message || 'Unable to read file.' }
+  }
+
+  return {
+    ok: true,
+    name: result.name,
+    path,
+    size: result.size || 0,
+    type: fileTypeFromPath(path),
+    body: fromBase64(result.content),
+  }
+}
+
+function fileResponse(request, env, file, download) {
+  const headers = {
+    'content-type': file.type,
+    'content-length': String(file.body.byteLength),
+    'cache-control': 'private, no-store',
+    ...corsHeaders(request, env),
+    'content-disposition': `${download ? 'attachment' : 'inline'}; filename="${encodeURIComponent(file.name)}"`,
+  }
+  return new Response(file.body, { status: 200, headers })
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders(request, env) })
-    }
-
-    if (request.method !== 'POST') {
-      return jsonResponse(request, env, { error: 'Only POST is supported.' }, 405)
     }
 
     if (!env.GITHUB_TOKEN || !env.UPLOAD_KEY) {
@@ -115,6 +214,31 @@ export default {
 
     if (request.headers.get('x-upload-key') !== env.UPLOAD_KEY) {
       return jsonResponse(request, env, { error: 'Upload key is invalid.' }, 401)
+    }
+
+    if (request.method === 'GET') {
+      const url = new URL(request.url)
+      const action = url.searchParams.get('action') || 'list'
+
+      if (action === 'list') {
+        const listed = await listGitHubFiles(env)
+        return listed.ok
+          ? jsonResponse(request, env, { files: listed.files })
+          : jsonResponse(request, env, { error: listed.message }, listed.status)
+      }
+
+      if (action === 'file') {
+        const path = url.searchParams.get('path') || ''
+        const file = await getGitHubFile(env, path)
+        if (!file.ok) return jsonResponse(request, env, { error: file.message }, file.status)
+        return fileResponse(request, env, file, url.searchParams.get('download') === '1')
+      }
+
+      return jsonResponse(request, env, { error: 'Unknown action.' }, 400)
+    }
+
+    if (request.method !== 'POST') {
+      return jsonResponse(request, env, { error: 'Only GET and POST are supported.' }, 405)
     }
 
     const formData = await request.formData()

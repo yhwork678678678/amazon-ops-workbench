@@ -49,11 +49,18 @@ type UploadedFile = {
   name: string
   size: number
   type: string
-  uploadedAt: string
+  uploadedAt: string | null
   path: string
   htmlUrl?: string
   commitUrl?: string
   sha?: string
+}
+
+type PreviewFile = {
+  name: string
+  type: string
+  url: string
+  text?: string
 }
 
 type CalculatorState = {
@@ -305,6 +312,8 @@ export function App() {
     uploadWorkerUrl ? '上传后会写入私密 GitHub 文件仓库。' : '需要先配置 VITE_UPLOAD_WORKER_URL 才能上传。',
   )
   const [cloudUploading, setCloudUploading] = useState(false)
+  const [cloudLoading, setCloudLoading] = useState(false)
+  const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null)
   const [clock, setClock] = useState(() => new Date())
   const [reminderMessage, setReminderMessage] = useState('')
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() =>
@@ -517,6 +526,43 @@ export function App() {
     }
   }
 
+  async function readCloudResponse(response: Response) {
+    const contentType = response.headers.get('content-type') || 'application/octet-stream'
+    if (!response.ok) {
+      const payload = await response.json() as { error?: string }
+      throw new Error(payload.error || '请求上传文件服务失败。')
+    }
+    return { contentType, response }
+  }
+
+  async function refreshUploadedFiles() {
+    if (!uploadWorkerUrl) {
+      setCloudFileMessage('需要先配置 VITE_UPLOAD_WORKER_URL 才能读取。')
+      return
+    }
+    if (!uploadKey.trim()) {
+      setCloudFileMessage('请先填写上传密钥，再读取私密仓库文件。')
+      return
+    }
+
+    setCloudLoading(true)
+    setCloudFileMessage('正在读取私密 GitHub 仓库文件...')
+    try {
+      const response = await fetch(`${uploadWorkerUrl}?action=list`, {
+        headers: { 'x-upload-key': uploadKey.trim() },
+      })
+      const { response: checkedResponse } = await readCloudResponse(response)
+      const payload = await checkedResponse.json() as { files: Omit<UploadedFile, 'id'>[] }
+      const filesFromRepository = payload.files.map((file) => ({ id: crypto.randomUUID(), ...file }))
+      setUploadedFiles(filesFromRepository)
+      setCloudFileMessage(`已读取 ${filesFromRepository.length} 个私密仓库文件。`)
+    } catch (error) {
+      setCloudFileMessage(error instanceof Error ? error.message : '读取文件失败，请稍后重试。')
+    } finally {
+      setCloudLoading(false)
+    }
+  }
+
   async function handleCloudFiles(fileList: FileList | null) {
     if (!fileList?.length || cloudUploading) return
 
@@ -533,6 +579,58 @@ export function App() {
       setCloudUploading(false)
       if (cloudFileInputRef.current) cloudFileInputRef.current.value = ''
     }
+  }
+
+  async function fetchCloudFile(file: UploadedFile, download = false) {
+    if (!uploadWorkerUrl || !uploadKey.trim()) {
+      setCloudFileMessage('请先配置上传服务并填写上传密钥。')
+      return null
+    }
+
+    const endpoint = new URL(uploadWorkerUrl)
+    endpoint.searchParams.set('action', 'file')
+    endpoint.searchParams.set('path', file.path)
+    if (download) endpoint.searchParams.set('download', '1')
+
+    const response = await fetch(endpoint, { headers: { 'x-upload-key': uploadKey.trim() } })
+    const { contentType } = await readCloudResponse(response)
+    const blob = await response.blob()
+    return { blob, contentType }
+  }
+
+  async function previewCloudFile(file: UploadedFile) {
+    try {
+      const result = await fetchCloudFile(file)
+      if (!result) return
+      const url = URL.createObjectURL(result.blob)
+      const preview: PreviewFile = { name: file.name, type: result.contentType, url }
+      if (result.contentType.startsWith('text/') || result.contentType === 'application/json') {
+        preview.text = await result.blob.text()
+      }
+      setPreviewFile(preview)
+    } catch (error) {
+      setCloudFileMessage(error instanceof Error ? error.message : '预览文件失败，请稍后重试。')
+    }
+  }
+
+  async function downloadCloudFile(file: UploadedFile) {
+    try {
+      const result = await fetchCloudFile(file, true)
+      if (!result) return
+      const url = URL.createObjectURL(result.blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = file.name
+      link.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (error) {
+      setCloudFileMessage(error instanceof Error ? error.message : '下载文件失败，请稍后重试。')
+    }
+  }
+
+  function closePreview() {
+    if (previewFile) URL.revokeObjectURL(previewFile.url)
+    setPreviewFile(null)
   }
 
   function downloadFile(file: StoredFile) {
@@ -878,7 +976,15 @@ export function App() {
                 <p className="eyebrow">GitHub vault</p>
                 <h3>上传文件区</h3>
               </div>
-              <FileUp size={20} />
+              <button
+                type="button"
+                className="icon-button"
+                title="刷新私密仓库文件"
+                disabled={cloudLoading}
+                onClick={() => void refreshUploadedFiles()}
+              >
+                <Search size={17} />
+              </button>
             </div>
 
             <input
@@ -920,15 +1026,18 @@ export function App() {
                     <div>
                       <strong>{file.name}</strong>
                       <span>
-                        {formatBytes(file.size)} · {new Date(file.uploadedAt).toLocaleString('zh-CN')}
+                        {formatBytes(file.size)} · {file.uploadedAt ? new Date(file.uploadedAt).toLocaleString('zh-CN') : '仓库文件'}
                       </span>
                       <small>{file.path}</small>
                     </div>
-                    {file.htmlUrl && (
-                      <button type="button" title="在 GitHub 查看" onClick={() => openExternal(file.htmlUrl!)}>
+                    <div className="cloud-file-actions">
+                      <button type="button" title="预览文件" onClick={() => void previewCloudFile(file)}>
                         <ExternalLink size={16} />
                       </button>
-                    )}
+                      <button type="button" title="下载文件" onClick={() => void downloadCloudFile(file)}>
+                        <Download size={16} />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
@@ -1004,6 +1113,37 @@ export function App() {
           <span>下一步可以接入真实销售报表、广告 CSV 解析、关键词库和 Cloudflare R2 文件同步。</span>
           <Settings size={18} />
         </footer>
+
+        {previewFile && (
+          <div className="preview-backdrop" role="presentation" onClick={closePreview}>
+            <section className="preview-dialog" role="dialog" aria-modal="true" aria-label={`预览 ${previewFile.name}`} onClick={(event) => event.stopPropagation()}>
+              <div className="preview-heading">
+                <div>
+                  <p className="eyebrow">File preview</p>
+                  <h3>{previewFile.name}</h3>
+                </div>
+                <button type="button" className="icon-button" title="关闭预览" onClick={closePreview}>
+                  <X size={17} />
+                </button>
+              </div>
+              <div className="preview-content">
+                {previewFile.text !== undefined ? (
+                  <pre>{previewFile.text}</pre>
+                ) : previewFile.type.startsWith('image/') ? (
+                  <img src={previewFile.url} alt={previewFile.name} />
+                ) : previewFile.type === 'application/pdf' ? (
+                  <iframe title={previewFile.name} src={previewFile.url} />
+                ) : previewFile.type.startsWith('video/') ? (
+                  <video controls src={previewFile.url} />
+                ) : previewFile.type.startsWith('audio/') ? (
+                  <audio controls src={previewFile.url} />
+                ) : (
+                  <p className="empty-state">这个文件类型不能在网页内预览，请关闭窗口后点击下载。</p>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
       </section>
     </main>
   )

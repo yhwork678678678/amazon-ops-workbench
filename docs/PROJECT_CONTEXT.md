@@ -30,6 +30,7 @@
 - 上架前检查：一组本地勾选项，用于 Listing 发布前快速复核。
 - 临时文件区：选择文件后保存到当前浏览器的 IndexedDB，可下载、删除。
 - 上传文件区：通过 Cloudflare Worker 把文件写入私密 GitHub 仓库 `amazon-ops-workbench-files`。
+- 上传文件区支持从私密仓库刷新列表，并通过 Worker 代理预览和下载。
 - 备忘录：保存运营事项到当前浏览器的 localStorage，可新增、删除。
 
 明确不在当前版本内：
@@ -222,6 +223,12 @@ GitHub private repo: yhwork678678678/amazon-ops-workbench-files
 
 ```text
 GitHub Pages 前端 -> Cloudflare Worker -> GitHub Contents API -> 私密文件仓库
+```
+
+读取链路：
+
+```text
+GitHub Pages 前端 -> Cloudflare Worker -> GitHub Git Trees / Contents API -> 文件列表、预览或下载
 ```
 
 ### 7.4 利润测算 CalculatorState
