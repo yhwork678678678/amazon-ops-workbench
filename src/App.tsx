@@ -502,11 +502,7 @@ export function App() {
     <main className="shell">
       <aside className="sidebar" aria-label="工作台导航">
         <div className="brand-block">
-          <div className="brand-mark">AMZ</div>
-          <div>
-            <p className="eyebrow">Personal console</p>
-            <h1>亚马逊运营工作台</h1>
-          </div>
+          <h1>工作台</h1>
         </div>
 
         <nav className="nav-list">
