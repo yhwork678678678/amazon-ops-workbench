@@ -19,15 +19,8 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-
-type Note = {
-  id: string
-  title: string
-  body: string
-  tag: string
-  createdAt: string
-  dueAt?: string
-}
+import { NotesPanel } from './components/NotesPanel'
+import type { Note } from './types'
 
 type UploadedFile = {
   id: string
@@ -795,68 +788,19 @@ export function App() {
           </article>
         </section>
 
-        <section className="split-grid notes-section">
-          <article className="panel" id="notes">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Memo stack</p>
-                <h3>运营备忘录</h3>
-              </div>
-              <NotebookPen size={20} />
-            </div>
-
-            <form className="note-form" onSubmit={handleNoteSubmit}>
-              <div className="note-form-row">
-                <input
-                  aria-label="备忘标题"
-                  placeholder="标题"
-                  value={noteTitle}
-                  onChange={(event) => setNoteTitle(event.target.value)}
-                />
-                <input
-                  aria-label="标签"
-                  placeholder="标签"
-                  value={noteTag}
-                  onChange={(event) => setNoteTag(event.target.value)}
-                />
-              </div>
-              <textarea
-                aria-label="备忘内容"
-                placeholder="记录今天调价、广告、Listing 或库存动作"
-                value={noteBody}
-                onChange={(event) => setNoteBody(event.target.value)}
-              />
-              <label className="note-due-field">
-                <span>提醒时间（可选）</span>
-                <input type="datetime-local" value={noteDueAt} onChange={(event) => setNoteDueAt(event.target.value)} />
-              </label>
-              <button type="submit">
-                <Plus size={16} />
-                新增备忘
-              </button>
-            </form>
-
-            <div className="note-list">
-              {notes.map((note) => (
-                <article className="note-card" key={note.id}>
-                  <div>
-                    <span>{note.tag}</span>
-                    <button
-                      type="button"
-                      title="删除备忘"
-                      onClick={() => setNotes((current) => current.filter((item) => item.id !== note.id))}
-                    >
-                      <X size={15} />
-                    </button>
-                  </div>
-                  <strong>{note.title}</strong>
-                  <p>{note.body}</p>
-                  {note.dueAt && <small className="note-due">提醒：{new Date(note.dueAt).toLocaleString('zh-CN')}</small>}
-                </article>
-              ))}
-            </div>
-          </article>
-        </section>
+        <NotesPanel
+          notes={notes}
+          noteTitle={noteTitle}
+          noteBody={noteBody}
+          noteTag={noteTag}
+          noteDueAt={noteDueAt}
+          onTitleChange={setNoteTitle}
+          onBodyChange={setNoteBody}
+          onTagChange={setNoteTag}
+          onDueAtChange={setNoteDueAt}
+          onSubmit={handleNoteSubmit}
+          onDelete={(id) => setNotes((current) => current.filter((item) => item.id !== id))}
+        />
 
         <footer className="footer-note">
           <PackageSearch size={18} />
