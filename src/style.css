@@ -128,17 +128,16 @@ p {
 
 .workspace {
   min-width: 0;
-  padding: 24px;
+  padding: 20px 24px 28px;
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .topbar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: flex-start;
-  gap: 18px;
-  min-height: 40px;
+  min-height: 0;
 }
 
 .topbar h2 {
@@ -152,6 +151,7 @@ p {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  margin-left: auto;
 }
 
 .topbar-actions button,
@@ -175,7 +175,7 @@ p {
   border-radius: 8px;
   background: #fff5d9;
   color: #624713;
-  padding: 12px 14px;
+  padding: 10px 12px;
 }
 
 .reminder-bar div {
@@ -193,7 +193,7 @@ p {
 .file-workspace {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
+  gap: 14px;
 }
 
 .split-grid {
@@ -235,7 +235,7 @@ p {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
-  padding: 18px;
+  padding: 16px;
   box-shadow: var(--shadow);
 }
 
