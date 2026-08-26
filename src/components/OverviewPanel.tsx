@@ -1,4 +1,4 @@
-import { Activity, Pencil, Plus, Save, X } from 'lucide-react'
+import { Activity, Bell, Pencil, Plus, Save, X } from 'lucide-react'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Workflow } from '../types'
@@ -90,15 +90,6 @@ export function OverviewPanel({ workflows, onSave, onDelete, onRestoreDefaults }
               <Plus size={16} />
               新增流程
             </button>
-            <button
-              type="button"
-              className="icon-button"
-              title="编辑巡检流程"
-              aria-label="编辑巡检流程"
-              onClick={() => setEditorOpen((open) => !open)}
-            >
-              <Pencil size={17} />
-            </button>
             <Activity size={20} />
           </div>
         </div>
@@ -107,32 +98,38 @@ export function OverviewPanel({ workflows, onSave, onDelete, onRestoreDefaults }
             <p className="empty-state">还没有巡检流程，请新增一条或恢复默认流程。</p>
           ) : (
             workflows.map((workflow) => (
-              <div className="timeline-row" key={workflow.id}>
-                <span>{workflow.time}</span>
+              <div className={`timeline-row ${editingId === workflow.id ? 'editing' : ''}`} key={workflow.id}>
+                <span className="timeline-time">
+                  <span>{workflow.time}</span>
+                  {workflow.reminderEnabled && (
+                    <small className="workflow-reminder-badge">
+                      <Bell size={11} />
+                      {workflow.reminderMinutes > 0 ? `提前${workflow.reminderMinutes}分` : '准时'}
+                    </small>
+                  )}
+                </span>
                 <strong>{workflow.title}</strong>
                 <p>{workflow.body}</p>
-                {editorOpen && (
-                  <div className="timeline-actions">
-                    <button
-                      type="button"
-                      className="icon-button"
-                      title="编辑"
-                      aria-label={`编辑 ${workflow.title}`}
-                      onClick={() => openEditor(workflow)}
-                    >
-                      <Pencil size={15} />
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-button"
-                      title="删除"
-                      aria-label={`删除 ${workflow.title}`}
-                      onClick={() => handleDelete(workflow.id)}
-                    >
-                      <X size={15} />
-                    </button>
-                  </div>
-                )}
+                <div className="timeline-actions">
+                  <button
+                    type="button"
+                    className="icon-button"
+                    title="编辑"
+                    aria-label={`编辑 ${workflow.title}`}
+                    onClick={() => openEditor(workflow)}
+                  >
+                    <Pencil size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    title="删除"
+                    aria-label={`删除 ${workflow.title}`}
+                    onClick={() => handleDelete(workflow.id)}
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
               </div>
             ))
           )}

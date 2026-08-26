@@ -1,4 +1,4 @@
-import { Download, ExternalLink, FileText, FileUp, Search, X } from 'lucide-react'
+import { Download, ExternalLink, FileText, FileUp, KeyRound, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { STORAGE_KEYS } from '../constants'
 import type { PreviewFile, UploadedFile } from '../types'
@@ -31,10 +31,13 @@ function readStoredUploadKey() {
 export function FilesPanel() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>(readStoredUploadedFiles)
   const [uploadKey, setUploadKey] = useState(readStoredUploadKey)
+  // 已有密钥时默认收起密钥栏，避免常驻占用整行
+  const [keyFieldOpen, setKeyFieldOpen] = useState(() => !readStoredUploadKey())
   const [cloudFileMessage, setCloudFileMessage] = useState(
-    uploadWorkerUrl ? '上传后会写入私密 GitHub 文件仓库。' : '需要先配置 VITE_UPLOAD_WORKER_URL 才能上传。',
+    uploadWorkerUrl ? '填写上传密钥后，即可上传到私密 GitHub 文件仓库。' : '需要先配置 VITE_UPLOAD_WORKER_URL 才能上传。',
   )
   const [cloudUploading, setCloudUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null)
   const [cloudLoading, setCloudLoading] = useState(false)
   const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null)
   const cloudFileInputRef = useRef<HTMLInputElement>(null)
@@ -149,11 +152,18 @@ export function FilesPanel() {
     if (!fileList?.length || cloudUploading) return
 
     setCloudUploading(true)
+    setUploadProgress({ done: 0, total: fileList.length })
     setCloudFileMessage(`正在上传 ${fileList.length} 个文件到私密 GitHub 仓库...`)
 
     try {
       // 用 allSettled 避免单个文件失败导致其他成功文件的结果丢失
-      const results = await Promise.allSettled(Array.from(fileList).map((file) => uploadCloudFile(file)))
+      const results = await Promise.allSettled(
+        Array.from(fileList).map(async (file) => {
+          const uploadedFile = await uploadCloudFile(file)
+          setUploadProgress((progress) => (progress ? { ...progress, done: progress.done + 1 } : progress))
+          return uploadedFile
+        }),
+      )
       const uploaded = results
         .filter((result): result is PromiseFulfilledResult<UploadedFile> => result.status === 'fulfilled')
         .map((result) => result.value)
@@ -171,6 +181,7 @@ export function FilesPanel() {
       setCloudFileMessage(error instanceof Error ? error.message : '上传失败，请稍后重试。')
     } finally {
       setCloudUploading(false)
+      setUploadProgress(null)
       if (cloudFileInputRef.current) cloudFileInputRef.current.value = ''
     }
   }
@@ -237,16 +248,27 @@ export function FilesPanel() {
             <p className="eyebrow">GitHub vault</p>
             <h3>上传文件区</h3>
           </div>
-          <button
-            type="button"
-            className="icon-button"
-            title="刷新私密仓库文件"
-            aria-label="刷新私密仓库文件"
-            disabled={cloudLoading}
-            onClick={() => void refreshUploadedFiles()}
-          >
-            <Search size={17} />
-          </button>
+          <div className="section-actions">
+            <button
+              type="button"
+              className="icon-text-button"
+              aria-expanded={keyFieldOpen}
+              onClick={() => setKeyFieldOpen((open) => !open)}
+            >
+              <KeyRound size={15} />
+              {keyFieldOpen ? '收起密钥' : '上传密钥'}
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              title="刷新私密仓库文件"
+              aria-label="刷新私密仓库文件"
+              disabled={cloudLoading}
+              onClick={() => void refreshUploadedFiles()}
+            >
+              <Search size={17} />
+            </button>
+          </div>
         </div>
 
         <input
@@ -257,15 +279,17 @@ export function FilesPanel() {
           onChange={(event) => void handleCloudFiles(event.target.files)}
         />
 
-        <label className="upload-key-field">
-          <span>上传密钥</span>
-          <input
-            type="password"
-            placeholder="输入 Worker 上传密钥"
-            value={uploadKey}
-            onChange={(event) => setUploadKey(event.target.value)}
-          />
-        </label>
+        {keyFieldOpen && (
+          <label className="upload-key-field">
+            <span>上传密钥</span>
+            <input
+              type="password"
+              placeholder="输入 Worker 上传密钥"
+              value={uploadKey}
+              onChange={(event) => setUploadKey(event.target.value)}
+            />
+          </label>
+        )}
 
         <button
           className="upload-zone cloud-upload-zone"
@@ -274,7 +298,18 @@ export function FilesPanel() {
           onClick={() => cloudFileInputRef.current?.click()}
         >
           <FileUp size={24} />
-          <span>{cloudUploading ? '正在上传...' : '上传到私密 GitHub 仓库'}</span>
+          <span className="upload-zone-label">
+            {cloudUploading && uploadProgress ? (
+              <>
+                <span className="spinner" aria-hidden="true" />
+                <span>
+                  正在上传 {uploadProgress.done}/{uploadProgress.total}
+                </span>
+              </>
+            ) : (
+              '上传到私密 GitHub 仓库'
+            )}
+          </span>
           <small>{cloudFileMessage}</small>
         </button>
 

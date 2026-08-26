@@ -22,15 +22,43 @@ type NotesPanelProps = {
   onCancelEdit: () => void
 }
 
-function formatNoteDate(value: string) {
+function formatNoteTime(value: string) {
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return { day: '--/--', time: '--:--' }
-
-  return {
-    day: date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }),
-    time: date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-  }
+  if (Number.isNaN(date.getTime())) return '--:--'
+  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
+
+function localDayKey(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function formatDayLabel(key: string) {
+  if (key === 'unknown') return '日期未知'
+
+  const now = new Date()
+  if (key === localDayKey(now)) return '今天'
+
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (key === localDayKey(yesterday)) return '昨天'
+
+  const [year, month, day] = key.split('-').map(Number)
+  return year === now.getFullYear() ? `${month}月${day}日` : `${year}年${month}月${day}日`
+}
+
+// 常见运营标签按语义配色，不认识的标签用默认青绿色
+const TAG_CLASSES: Record<string, string> = {
+  广告: 'tag-ad',
+  Listing: 'tag-listing',
+  库存: 'tag-inventory',
+  调价: 'tag-pricing',
+  复盘: 'tag-review',
+}
+
+type NoteGroup = { key: string; label: string; notes: Note[] }
 
 export function NotesPanel({
   notes,
@@ -50,14 +78,24 @@ export function NotesPanel({
   onEdit,
   onCancelEdit,
 }: NotesPanelProps) {
-  // 按创建时间倒序排列，仅在备忘列表变化时重新排序
-  const timelineNotes = useMemo(
-    () =>
-      [...notes].sort(
-        (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
-      ),
-    [notes],
-  )
+  // 按创建时间倒序排列并分天分组，仅在备忘列表变化时重新计算
+  const noteGroups = useMemo(() => {
+    const sorted = [...notes].sort(
+      (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+    )
+    const groups: NoteGroup[] = []
+    for (const note of sorted) {
+      const date = new Date(note.createdAt)
+      const key = Number.isNaN(date.getTime()) ? 'unknown' : localDayKey(date)
+      const last = groups[groups.length - 1]
+      if (last && last.key === key) {
+        last.notes.push(note)
+      } else {
+        groups.push({ key, label: formatDayLabel(key), notes: [note] })
+      }
+    }
+    return groups
+  }, [notes])
 
   return (
     <section className="split-grid notes-section">
@@ -118,35 +156,39 @@ export function NotesPanel({
         </form>
 
         <div className="note-timeline">
-          {timelineNotes.map((note) => {
-            const date = formatNoteDate(note.createdAt)
+          {noteGroups.map((group) => (
+            <div className="note-day-group" key={group.key}>
+              <div className="note-day-label">{group.label}</div>
+              {group.notes.map((note) => {
+                const time = formatNoteTime(note.createdAt)
 
-            return (
-              <article className="note-entry" key={note.id}>
-                <div className="note-date" aria-label={`记录于 ${date.day} ${date.time}`}>
-                  <strong>{date.day}</strong>
-                  <span>{date.time}</span>
-                </div>
-                <div className="note-marker" aria-hidden="true" />
-                <div className="note-card">
-                  <div>
-                    <span>{note.tag}</span>
-                    <div className="note-card-actions">
-                      <button type="button" title="编辑备忘" aria-label={`编辑备忘 ${note.title}`} onClick={() => onEdit(note)}>
-                        <Pencil size={15} />
-                      </button>
-                      <button type="button" title="删除备忘" aria-label={`删除备忘 ${note.title}`} onClick={() => onDelete(note.id)}>
-                        <X size={15} />
-                      </button>
+                return (
+                  <article className="note-entry" key={note.id}>
+                    <div className="note-date" aria-label={`记录于 ${group.label} ${time}`}>
+                      <strong>{time}</strong>
                     </div>
-                  </div>
-                  <strong>{note.title}</strong>
-                  <p>{note.body}</p>
-                  {note.dueAt && <small className="note-due">提醒：{new Date(note.dueAt).toLocaleString('zh-CN')}</small>}
-                </div>
-              </article>
-            )
-          })}
+                    <div className="note-marker" aria-hidden="true" />
+                    <div className="note-card">
+                      <div>
+                        <span className={`note-tag ${TAG_CLASSES[note.tag] || ''}`}>{note.tag}</span>
+                        <div className="note-card-actions">
+                          <button type="button" title="编辑备忘" aria-label={`编辑备忘 ${note.title}`} onClick={() => onEdit(note)}>
+                            <Pencil size={15} />
+                          </button>
+                          <button type="button" title="删除备忘" aria-label={`删除备忘 ${note.title}`} onClick={() => onDelete(note.id)}>
+                            <X size={15} />
+                          </button>
+                        </div>
+                      </div>
+                      <strong>{note.title}</strong>
+                      <p>{note.body}</p>
+                      {note.dueAt && <small className="note-due">提醒：{new Date(note.dueAt).toLocaleString('zh-CN')}</small>}
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          ))}
         </div>
       </article>
     </section>

@@ -65,17 +65,15 @@ export function CalculatorPanel({ calculator, onChange }: CalculatorPanelProps) 
         </div>
 
         <div className="result-strip">
-          <div>
+          <div className={`result-primary ${financials.profit >= 0 ? 'positive' : 'negative'}`}>
             <span>预估利润</span>
-            <strong className={financials.profit >= 0 ? 'positive' : 'negative'}>
-              ${financials.profit.toFixed(2)}
-            </strong>
+            <strong>${financials.profit.toFixed(2)}</strong>
           </div>
-          <div>
+          <div className="result-secondary">
             <span>利润率</span>
             <strong>{financials.margin.toFixed(1)}%</strong>
           </div>
-          <div>
+          <div className="result-secondary">
             <span>ROI</span>
             <strong>{financials.roi.toFixed(1)}%</strong>
           </div>

@@ -4,8 +4,6 @@ import {
   Calculator,
   LayoutDashboard,
   NotebookPen,
-  PackageSearch,
-  Settings,
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -374,13 +372,18 @@ export function App() {
           </a>
         </nav>
 
+        <p className="sidebar-foot">下一步：销售报表、广告 CSV 解析、Cloudflare R2 文件同步。</p>
       </aside>
 
       <section className="workspace">
         <header className="topbar">
+          <div className="topbar-date" aria-label="当前日期">
+            <strong>{clock.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}</strong>
+            <span>{clock.toLocaleDateString('zh-CN', { weekday: 'long' })}</span>
+          </div>
           <div className="topbar-actions">
             {notificationPermission === 'default' && (
-              <button type="button" onClick={() => void enableNotifications()}>
+              <button type="button" className="icon-text-button" onClick={() => void enableNotifications()}>
                 <Bell size={16} />
                 开启通知
               </button>
@@ -441,12 +444,6 @@ export function App() {
           onEdit={startNoteEdit}
           onCancelEdit={cancelNoteEdit}
         />
-
-        <footer className="footer-note">
-          <PackageSearch size={18} />
-          <span>下一步可以接入真实销售报表、广告 CSV 解析、关键词库和 Cloudflare R2 文件同步。</span>
-          <Settings size={18} />
-        </footer>
 
         {undoEntry && (
           <div className="undo-toast" role="status">
