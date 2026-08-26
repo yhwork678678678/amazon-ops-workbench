@@ -176,6 +176,7 @@ export function App() {
   const [noteBody, setNoteBody] = useState('')
   const [noteTag, setNoteTag] = useState('运营')
   const [noteDueAt, setNoteDueAt] = useState('')
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>(readStoredUploadedFiles)
   const [uploadKey, setUploadKey] = useState(readStoredUploadKey)
   const [cloudFileMessage, setCloudFileMessage] = useState(
@@ -303,7 +304,7 @@ export function App() {
     if (!noteTitle.trim() && !noteBody.trim()) return
 
     const nextNote: Note = {
-      id: crypto.randomUUID(),
+      id: editingNoteId ?? crypto.randomUUID(),
       title: noteTitle.trim() || '未命名备忘',
       body: noteBody.trim(),
       tag: noteTag.trim() || '运营',
@@ -311,7 +312,27 @@ export function App() {
       dueAt: noteDueAt || undefined,
     }
 
-    setNotes((current) => [nextNote, ...current])
+    setNotes((current) => editingNoteId
+      ? current.map((note) => note.id === editingNoteId ? { ...nextNote, createdAt: note.createdAt } : note)
+      : [nextNote, ...current])
+    setEditingNoteId(null)
+    setNoteTitle('')
+    setNoteBody('')
+    setNoteTag('运营')
+    setNoteDueAt('')
+  }
+
+  function startNoteEdit(note: Note) {
+    setEditingNoteId(note.id)
+    setNoteTitle(note.title)
+    setNoteBody(note.body)
+    setNoteTag(note.tag)
+    setNoteDueAt(note.dueAt || '')
+    document.getElementById('notes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  function cancelNoteEdit() {
+    setEditingNoteId(null)
     setNoteTitle('')
     setNoteBody('')
     setNoteTag('运营')
@@ -799,7 +820,13 @@ export function App() {
           onTagChange={setNoteTag}
           onDueAtChange={setNoteDueAt}
           onSubmit={handleNoteSubmit}
-          onDelete={(id) => setNotes((current) => current.filter((item) => item.id !== id))}
+          onDelete={(id) => {
+            setNotes((current) => current.filter((item) => item.id !== id))
+            if (editingNoteId === id) cancelNoteEdit()
+          }}
+          editingNoteId={editingNoteId}
+          onEdit={startNoteEdit}
+          onCancelEdit={cancelNoteEdit}
         />
 
         <footer className="footer-note">

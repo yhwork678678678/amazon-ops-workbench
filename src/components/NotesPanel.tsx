@@ -1,4 +1,4 @@
-import { NotebookPen, Plus, X } from 'lucide-react'
+import { NotebookPen, Pencil, Plus, X } from 'lucide-react'
 import type { Dispatch, FormEvent, SetStateAction } from 'react'
 import type { Note } from '../types'
 
@@ -14,6 +14,9 @@ type NotesPanelProps = {
   onDueAtChange: Dispatch<SetStateAction<string>>
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onDelete: (id: string) => void
+  editingNoteId: string | null
+  onEdit: (note: Note) => void
+  onCancelEdit: () => void
 }
 
 function formatNoteDate(value: string) {
@@ -38,6 +41,9 @@ export function NotesPanel({
   onDueAtChange,
   onSubmit,
   onDelete,
+  editingNoteId,
+  onEdit,
+  onCancelEdit,
 }: NotesPanelProps) {
   return (
     <section className="split-grid notes-section">
@@ -51,6 +57,7 @@ export function NotesPanel({
         </div>
 
         <form className="note-form note-composer" onSubmit={onSubmit}>
+          {editingNoteId && <div className="note-editing-state">正在编辑备忘</div>}
           <div className="note-form-row">
             <input
               aria-label="备忘标题"
@@ -76,10 +83,17 @@ export function NotesPanel({
               <span>提醒时间（可选）</span>
               <input type="datetime-local" value={noteDueAt} onChange={(event) => onDueAtChange(event.target.value)} />
             </label>
-            <button type="submit">
-              <Plus size={16} />
-              新增备忘
-            </button>
+            <div className="note-composer-actions">
+              <button type="submit">
+                {editingNoteId ? <Pencil size={16} /> : <Plus size={16} />}
+                {editingNoteId ? '保存修改' : '新增备忘'}
+              </button>
+              {editingNoteId && (
+                <button type="button" className="icon-text-button" onClick={onCancelEdit}>
+                  取消编辑
+                </button>
+              )}
+            </div>
           </div>
         </form>
 
@@ -97,9 +111,14 @@ export function NotesPanel({
                 <div className="note-card">
                   <div>
                     <span>{note.tag}</span>
-                    <button type="button" title="删除备忘" onClick={() => onDelete(note.id)}>
-                      <X size={15} />
-                    </button>
+                    <div className="note-card-actions">
+                      <button type="button" title="编辑备忘" onClick={() => onEdit(note)}>
+                        <Pencil size={15} />
+                      </button>
+                      <button type="button" title="删除备忘" onClick={() => onDelete(note.id)}>
+                        <X size={15} />
+                      </button>
+                    </div>
                   </div>
                   <strong>{note.title}</strong>
                   <p>{note.body}</p>
