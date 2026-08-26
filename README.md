@@ -38,6 +38,7 @@ VITE_UPLOAD_WORKER_URL=https://your-worker.your-subdomain.workers.dev
 ## 数据说明
 
 - 备忘录保存在当前浏览器的 `localStorage`。
+- 页面会自动检查新构建；检测到 GitHub Pages 有新版本时自动刷新，不会清除本地备忘和配置。
 - 上传文件通过 Cloudflare Worker 写入私密仓库 `amazon-ops-workbench-files`。
 - 上传文件区可以刷新私密仓库文件列表、预览图片/PDF/文本/音视频，并下载文件。
 - 上传密钥保存在当前浏览器的 `localStorage`，不要把密钥发给无关人员。
