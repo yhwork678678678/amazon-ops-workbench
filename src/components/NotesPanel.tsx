@@ -1,4 +1,5 @@
 import { NotebookPen, Pencil, Plus, X } from 'lucide-react'
+import { useMemo } from 'react'
 import type { Dispatch, FormEvent, SetStateAction } from 'react'
 import type { Note } from '../types'
 
@@ -49,8 +50,13 @@ export function NotesPanel({
   onEdit,
   onCancelEdit,
 }: NotesPanelProps) {
-  const timelineNotes = [...notes].sort(
-    (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  // 按创建时间倒序排列，仅在备忘列表变化时重新排序
+  const timelineNotes = useMemo(
+    () =>
+      [...notes].sort(
+        (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+      ),
+    [notes],
   )
 
   return (
@@ -126,10 +132,10 @@ export function NotesPanel({
                   <div>
                     <span>{note.tag}</span>
                     <div className="note-card-actions">
-                      <button type="button" title="编辑备忘" onClick={() => onEdit(note)}>
+                      <button type="button" title="编辑备忘" aria-label={`编辑备忘 ${note.title}`} onClick={() => onEdit(note)}>
                         <Pencil size={15} />
                       </button>
-                      <button type="button" title="删除备忘" onClick={() => onDelete(note.id)}>
+                      <button type="button" title="删除备忘" aria-label={`删除备忘 ${note.title}`} onClick={() => onDelete(note.id)}>
                         <X size={15} />
                       </button>
                     </div>

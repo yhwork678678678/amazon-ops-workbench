@@ -1,6 +1,6 @@
 # 亚马逊运营工作台项目文档
 
-文档版本：`v0.1.16`
+文档版本：`v0.1.17`
 
 最后更新：`2026-08-26`
 
@@ -50,6 +50,7 @@ GitHub Pages 只能托管静态文件，不能直接安全保存用户上传文�
 
 - 新上传文件名使用 `YYYY-MM-DD-原文件名` 格式。
 - 仓库路径按月份和日期分目录，例如 `uploads/2026-08/25/2026-08-25-report.xlsx`。
+- 同一天上传同名文件时，Worker 自动追加 `-2`、`-3` 序号，避免覆盖或冲突报错。
 - 修改命名规则不会自动改名历史文件。
 
 上传文件区意味着：
@@ -100,7 +101,14 @@ D:\桌面\工作\工作台
 ├─ src/
 │  ├─ App.tsx
 │  ├─ main.tsx
-│  └─ style.css
+│  ├─ style.css
+│  ├─ types.ts
+│  ├─ constants.ts
+│  └─ components/
+│     ├─ NotesPanel.tsx
+│     ├─ OverviewPanel.tsx
+│     ├─ CalculatorPanel.tsx
+│     └─ FilesPanel.tsx
 ├─ .gitignore
 ├─ AGENTS.md
 ├─ README.md
@@ -113,11 +121,15 @@ D:\桌面\工作\工作台
 
 核心文件说明：
 
-- `src/App.tsx`：主业务界面和本地状态逻辑。
+- `src/App.tsx`：备忘、巡检、测算的顶层状态、提醒逻辑、导航高亮和删除撤销。
 - `src/components/NotesPanel.tsx`：备忘录输入、创建时间编辑、时间线展示和删除操作。
+- `src/components/OverviewPanel.tsx`：日常巡检流程展示与增删改编辑器（时间输入为 `type="time"`）。
+- `src/components/CalculatorPanel.tsx`：单品利润测算输入与结果（输入层用字符串保存）。
+- `src/components/FilesPanel.tsx`：上传文件区，含 Worker 通信、密钥、预览弹窗和下载。
 - `src/types.ts`：跨组件复用的数据类型。
+- `src/constants.ts`：localStorage 存储键常量。
 - `src/style.css`：完整视觉样式和响应式布局。
-- `src/main.tsx`：React 入口。
+- `src/main.tsx`：React 入口和构建版本自动刷新检查。
 - `vite.config.ts`：Vite 配置，当前使用 `base: './'`。
 - `worker/upload.js`：Cloudflare Worker 上传中转服务。
 - `wrangler.toml`：Worker 部署配置，不包含 secret。
@@ -214,18 +226,23 @@ GitHub Pages 前端 -> Cloudflare Worker -> GitHub Contents API -> 私密文件�
 GitHub Pages 前端 -> Cloudflare Worker -> GitHub Git Trees / Contents API -> 文件列表、预览或下载
 ```
 
+文件内容读取使用 raw 媒体类型，避免 Contents API 对超过 1MB 文件返回 403；文件列表超过 500 个时截断并提示。
+
 ### 7.3 利润测算 CalculatorState
 
 ```ts
+// 输入层用字符串保存，避免受控 number 输入打不出中间态（如 "29."）
 type CalculatorState = {
-  salePrice: number
-  cost: number
-  shipping: number
-  fbaFee: number
-  adSpend: number
-  referralRate: number
+  salePrice: string
+  cost: string
+  shipping: string
+  fbaFee: string
+  adSpend: string
+  referralRate: string
 }
 ```
+
+读取时会兼容旧版本保存的数字类型数据并转换为字符串；计算时用 `Number()` 转换，非法输入按 0 处理。
 
 存储位置：
 
@@ -264,7 +281,9 @@ localStorage["amazon-workbench-workflows"]
 
 页面支持新增、编辑、删除和恢复默认流程。数据只保存在当前浏览器，不会上传到 GitHub。
 
-备忘录可选设置 `dueAt` 日期时间。页面每 30 秒检查一次到期项，在未来 24 小时内显示提醒；获得浏览器通知权限后，同时发送系统通知。网页完全关闭时不保证提醒。
+删除备忘、删除巡检流程和恢复默认流程后，右下角会显示 5 秒可撤销提示，撤销后恢复到原位置；超时或关闭提示后删除生效。
+
+备忘录可选设置 `dueAt` 日期时间。页面每 30 秒检查一次到期项，在未来 24 小时内显示提醒；获得浏览器通知权限后，同时发送系统通知。提醒去重键按本地日期生成，编辑备忘后当天可以重新触发提醒。提醒消息可以手动关闭，显示 10 分钟后自动清空。网页完全关闭时不保证提醒。
 
 ## 8. 部署设计
 

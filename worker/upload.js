@@ -70,15 +70,6 @@ function toBase64(arrayBuffer) {
   return btoa(binary)
 }
 
-function fromBase64(value) {
-  const binary = atob(value.replace(/\s/g, ''))
-  const bytes = new Uint8Array(binary.length)
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index)
-  }
-  return bytes
-}
-
 function fileTypeFromPath(path) {
   const dotIndex = path.lastIndexOf('.')
   const extension = dotIndex >= 0 ? path.slice(dotIndex).toLowerCase() : ''
@@ -108,8 +99,39 @@ function buildUploadPath(env, originalName) {
   return `${env.UPLOAD_DIR}/${year}-${month}/${day}/${year}-${month}-${day}-${safeName}`
 }
 
+async function pathExists(env, path) {
+  const endpoint = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURIComponent(path).replace(/%2F/g, '/')}?ref=${encodeURIComponent(env.GITHUB_BRANCH)}`
+  try {
+    const response = await fetch(endpoint, { headers: githubHeaders(env) })
+    if (response.ok) return true
+    // 404 表示不存在；其他错误交给后续 PUT 返回真实错误
+    return false
+  } catch {
+    return false
+  }
+}
+
+function withSequence(path, sequence) {
+  const lastSlash = path.lastIndexOf('/')
+  const dotIndex = path.lastIndexOf('.')
+  return dotIndex > lastSlash
+    ? `${path.slice(0, dotIndex)}-${sequence}${path.slice(dotIndex)}`
+    : `${path}-${sequence}`
+}
+
+async function resolveAvailablePath(env, basePath) {
+  if (!(await pathExists(env, basePath))) return basePath
+
+  for (let sequence = 2; sequence <= 99; sequence += 1) {
+    const candidate = withSequence(basePath, sequence)
+    if (!(await pathExists(env, candidate))) return candidate
+  }
+
+  return withSequence(basePath, Date.now())
+}
+
 async function uploadToGitHub(env, file, content) {
-  const path = buildUploadPath(env, file.name)
+  const path = await resolveAvailablePath(env, buildUploadPath(env, file.name))
   const endpoint = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURIComponent(path).replace(/%2F/g, '/')}`
   const response = await fetch(endpoint, {
     method: 'PUT',
@@ -163,7 +185,10 @@ async function listGitHubFiles(env) {
     }))
     .sort((left, right) => right.path.localeCompare(left.path))
 
-  return { ok: true, files }
+  const maxListed = Number(env.MAX_LISTED_FILES || 500)
+  const truncated = files.length > maxListed
+
+  return { ok: true, files: files.slice(0, maxListed), truncated }
 }
 
 async function getGitHubFile(env, path) {
@@ -171,22 +196,31 @@ async function getGitHubFile(env, path) {
     return { ok: false, status: 400, message: 'Invalid file path.' }
   }
 
+  // 用 raw 媒体类型直接取文件原始内容，避免 Contents API 对超过 1MB 文件返回 403
   const endpoint = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURIComponent(path).replace(/%2F/g, '/')}?ref=${encodeURIComponent(env.GITHUB_BRANCH)}`
-  const response = await fetch(endpoint, { headers: githubHeaders(env) })
-  const result = await response.json()
+  const response = await fetch(endpoint, { headers: githubHeaders(env, 'application/vnd.github.raw') })
 
-  if (!response.ok || result.type !== 'file' || typeof result.content !== 'string') {
-    return { ok: false, status: response.status || 404, message: result?.message || 'Unable to read file.' }
+  if (response.ok) {
+    const body = await response.arrayBuffer()
+    return {
+      ok: true,
+      name: path.split('/').pop() || path,
+      path,
+      size: body.byteLength,
+      type: fileTypeFromPath(path),
+      body: new Uint8Array(body),
+    }
   }
 
-  return {
-    ok: true,
-    name: result.name,
-    path,
-    size: result.size || 0,
-    type: fileTypeFromPath(path),
-    body: fromBase64(result.content),
+  let message = 'Unable to read file.'
+  try {
+    const payload = await response.json()
+    if (payload && typeof payload.message === 'string') message = payload.message
+  } catch {
+    // 非 JSON 错误体，保留默认信息
   }
+
+  return { ok: false, status: response.status || 404, message }
 }
 
 function fileResponse(request, env, file, download) {

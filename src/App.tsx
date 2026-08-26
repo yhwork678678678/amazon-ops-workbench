@@ -1,88 +1,43 @@
 import {
-  Activity,
   Archive,
   Bell,
   Calculator,
-  Download,
-  ExternalLink,
-  FileText,
-  FileUp,
   LayoutDashboard,
   NotebookPen,
   PackageSearch,
-  Pencil,
-  Plus,
-  Search,
-  Save,
   Settings,
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { CalculatorPanel } from './components/CalculatorPanel'
+import { FilesPanel } from './components/FilesPanel'
 import { NotesPanel } from './components/NotesPanel'
-import type { Note } from './types'
+import { OverviewPanel } from './components/OverviewPanel'
+import { STORAGE_KEYS } from './constants'
+import type { CalculatorState, Note, Workflow } from './types'
 
-type UploadedFile = {
-  id: string
-  name: string
-  size: number
-  type: string
-  uploadedAt: string | null
-  path: string
-  htmlUrl?: string
-  commitUrl?: string
-  sha?: string
-}
+// 删除/恢复操作的可撤销记录，5 秒内可以恢复
+type UndoEntry =
+  | { kind: 'note'; note: Note; index: number }
+  | { kind: 'workflow'; workflow: Workflow; index: number }
+  | { kind: 'workflows'; workflows: Workflow[] }
 
-type PreviewFile = {
-  name: string
-  type: string
-  url: string
-  text?: string
-}
-
-type CalculatorState = {
-  salePrice: number
-  cost: number
-  shipping: number
-  fbaFee: number
-  adSpend: number
-  referralRate: number
-}
-
-type Workflow = {
-  id: string
-  time: string
-  title: string
-  body: string
-  reminderEnabled: boolean
-  reminderMinutes: number
-}
-
-const STORAGE_KEYS = {
-  notes: 'amazon-workbench-notes',
-  calculator: 'amazon-workbench-calculator',
-  workflows: 'amazon-workbench-workflows',
-  uploadedFiles: 'amazon-workbench-uploaded-files',
-  uploadKey: 'amazon-workbench-upload-key',
-}
-
-const uploadWorkerUrl = import.meta.env.VITE_UPLOAD_WORKER_URL as string | undefined
-
+// 示例备忘使用固定时间戳，避免首次打开或数据损坏回退时显示"刚刚创建"
 const defaultNotes: Note[] = [
   {
     id: 'note-1',
     title: '今天先看广告异常',
     body: '先筛 ACOS 高于 35% 的广告组，再看转化率低但点击多的关键词。',
     tag: '广告',
-    createdAt: new Date().toISOString(),
+    createdAt: '2026-08-05T09:00:00.000Z',
   },
   {
     id: 'note-2',
     title: '新品页检查',
     body: '主图、五点、A+、QA、coupon、库存、配送时效逐项过一遍。',
     tag: 'Listing',
-    createdAt: new Date().toISOString(),
+    createdAt: '2026-08-05T10:30:00.000Z',
   },
 ]
 
@@ -94,12 +49,12 @@ const defaultWorkflows: Workflow[] = [
 ]
 
 const defaultCalculator: CalculatorState = {
-  salePrice: 29.99,
-  cost: 7.2,
-  shipping: 2.1,
-  fbaFee: 5.3,
-  adSpend: 3.5,
-  referralRate: 15,
+  salePrice: '29.99',
+  cost: '7.2',
+  shipping: '2.1',
+  fbaFee: '5.3',
+  adSpend: '3.5',
+  referralRate: '15',
 }
 
 function readStoredNotes() {
@@ -114,31 +69,22 @@ function readStoredNotes() {
   }
 }
 
-function readStoredCalculator() {
+function readStoredCalculator(): CalculatorState {
   const raw = localStorage.getItem(STORAGE_KEYS.calculator)
   if (!raw) return defaultCalculator
 
   try {
-    return { ...defaultCalculator, ...(JSON.parse(raw) as Partial<CalculatorState>) }
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    const next = { ...defaultCalculator }
+    // 兼容旧版本保存的数字类型数据
+    for (const key of Object.keys(defaultCalculator) as (keyof CalculatorState)[]) {
+      const value = parsed[key]
+      if (typeof value === 'number' || typeof value === 'string') next[key] = String(value)
+    }
+    return next
   } catch {
     return defaultCalculator
   }
-}
-
-function readStoredUploadedFiles() {
-  const raw = localStorage.getItem(STORAGE_KEYS.uploadedFiles)
-  if (!raw) return []
-
-  try {
-    const parsed = JSON.parse(raw) as UploadedFile[]
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function readStoredUploadKey() {
-  return localStorage.getItem(STORAGE_KEYS.uploadKey) || ''
 }
 
 function readStoredWorkflows() {
@@ -159,13 +105,6 @@ function readStoredWorkflows() {
   }
 }
 
-function formatBytes(bytes: number) {
-  if (bytes === 0) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
-  return `${(bytes / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`
-}
-
 function toDateTimeLocal(value: string | Date) {
   const date = typeof value === 'string' ? new Date(value) : value
   if (Number.isNaN(date.getTime())) return ''
@@ -179,34 +118,32 @@ function toISOStringOrNow(value: string) {
   return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString()
 }
 
+// 提醒去重键使用本地日期（此前用 UTC 日期，跨时区边界时同一天可能重复提醒）
+function toLocalDateKey(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export function App() {
   const [notes, setNotes] = useState<Note[]>(readStoredNotes)
   const [workflows, setWorkflows] = useState<Workflow[]>(readStoredWorkflows)
-  const [workflowEditorOpen, setWorkflowEditorOpen] = useState(false)
-  const [editingWorkflowId, setEditingWorkflowId] = useState<string | null>(null)
-  const [workflowDraft, setWorkflowDraft] = useState({ time: '', title: '', body: '', reminderEnabled: true, reminderMinutes: 10 })
+  const [calculator, setCalculator] = useState<CalculatorState>(readStoredCalculator)
   const [noteTitle, setNoteTitle] = useState('')
   const [noteBody, setNoteBody] = useState('')
   const [noteTag, setNoteTag] = useState('运营')
   const [noteCreatedAt, setNoteCreatedAt] = useState(() => toDateTimeLocal(new Date()))
   const [noteDueAt, setNoteDueAt] = useState('')
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>(readStoredUploadedFiles)
-  const [uploadKey, setUploadKey] = useState(readStoredUploadKey)
-  const [cloudFileMessage, setCloudFileMessage] = useState(
-    uploadWorkerUrl ? '上传后会写入私密 GitHub 文件仓库。' : '需要先配置 VITE_UPLOAD_WORKER_URL 才能上传。',
-  )
-  const [cloudUploading, setCloudUploading] = useState(false)
-  const [cloudLoading, setCloudLoading] = useState(false)
-  const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null)
   const [clock, setClock] = useState(() => new Date())
   const [reminderMessage, setReminderMessage] = useState('')
   const [activeSection, setActiveSection] = useState('notes')
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() =>
     'Notification' in window ? Notification.permission : 'unsupported',
   )
-  const [calculator, setCalculator] = useState<CalculatorState>(readStoredCalculator)
-  const cloudFileInputRef = useRef<HTMLInputElement>(null)
+  const [undoEntry, setUndoEntry] = useState<UndoEntry | null>(null)
+  const undoTimeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.notes, JSON.stringify(notes))
@@ -221,21 +158,16 @@ export function App() {
   }, [workflows])
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.uploadedFiles, JSON.stringify(uploadedFiles))
-  }, [uploadedFiles])
-
-  useEffect(() => {
-    if (uploadKey) {
-      localStorage.setItem(STORAGE_KEYS.uploadKey, uploadKey)
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.uploadKey)
-    }
-  }, [uploadKey])
-
-  useEffect(() => {
     const timer = window.setInterval(() => setClock(new Date()), 30_000)
     return () => window.clearInterval(timer)
   }, [])
+
+  // 提醒消息显示 10 分钟后自动清空，避免一直挂在顶部
+  useEffect(() => {
+    if (!reminderMessage) return
+    const timer = window.setTimeout(() => setReminderMessage(''), 10 * 60 * 1000)
+    return () => window.clearTimeout(timer)
+  }, [reminderMessage])
 
   useEffect(() => {
     const sectionIds = ['notes', 'overview', 'calculator', 'files']
@@ -292,7 +224,7 @@ export function App() {
       const reminderAt = item.dueAt.getTime() - reminderMinutes * 60 * 1000
       if (now < reminderAt || now > item.dueAt.getTime() + 15 * 60 * 1000) return
 
-      const reminderKey = `amazon-workbench-reminded:${item.id}:${item.dueAt.toISOString().slice(0, 10)}`
+      const reminderKey = `amazon-workbench-reminded:${item.id}:${toLocalDateKey(item.dueAt)}`
       if (sessionStorage.getItem(reminderKey)) return
       sessionStorage.setItem(reminderKey, '1')
       const message = `${item.source}提醒：${item.title}`
@@ -300,18 +232,6 @@ export function App() {
       if (notificationPermission === 'granted') new Notification('亚马逊运营工作台', { body: message })
     })
   }, [clock, notes, notificationPermission, pendingReminders, workflows])
-
-  const financials = useMemo(() => {
-    const referralFee = calculator.salePrice * (calculator.referralRate / 100)
-    const totalCost =
-      calculator.cost + calculator.shipping + calculator.fbaFee + calculator.adSpend + referralFee
-    const profit = calculator.salePrice - totalCost
-    const margin = calculator.salePrice ? (profit / calculator.salePrice) * 100 : 0
-    const landedCost = calculator.cost + calculator.shipping
-    const roi = landedCost ? (profit / landedCost) * 100 : 0
-
-    return { referralFee, totalCost, profit, margin, roi }
-  }, [calculator])
 
   function handleNoteSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -324,6 +244,11 @@ export function App() {
       tag: noteTag.trim() || '运营',
       createdAt: toISOStringOrNow(noteCreatedAt),
       dueAt: noteDueAt || undefined,
+    }
+
+    // 编辑后清除当天的已提醒标记，让修改过的提醒时间当天可以重新触发
+    if (nextNote.dueAt) {
+      sessionStorage.removeItem(`amazon-workbench-reminded:${nextNote.id}:${toLocalDateKey(new Date(nextNote.dueAt))}`)
     }
 
     setNotes((current) => editingNoteId
@@ -356,198 +281,72 @@ export function App() {
     setNoteDueAt('')
   }
 
+  function deleteNote(id: string) {
+    const index = notes.findIndex((item) => item.id === id)
+    if (index < 0) return
+    scheduleUndo({ kind: 'note', note: notes[index], index })
+    setNotes((current) => current.filter((item) => item.id !== id))
+    if (editingNoteId === id) cancelNoteEdit()
+  }
+
+  function saveWorkflow(workflow: Workflow) {
+    setWorkflows((current) =>
+      current.some((entry) => entry.id === workflow.id)
+        ? current.map((entry) => (entry.id === workflow.id ? workflow : entry))
+        : [...current, workflow],
+    )
+  }
+
+  function deleteWorkflow(id: string) {
+    const index = workflows.findIndex((entry) => entry.id === id)
+    if (index < 0) return
+    scheduleUndo({ kind: 'workflow', workflow: workflows[index], index })
+    setWorkflows((current) => current.filter((entry) => entry.id !== id))
+  }
+
+  function restoreDefaultWorkflows() {
+    if (workflows.length > 0) scheduleUndo({ kind: 'workflows', workflows })
+    setWorkflows(defaultWorkflows)
+  }
+
+  function scheduleUndo(entry: UndoEntry) {
+    if (undoTimeoutRef.current !== null) window.clearTimeout(undoTimeoutRef.current)
+    setUndoEntry(entry)
+    undoTimeoutRef.current = window.setTimeout(() => {
+      setUndoEntry(null)
+      undoTimeoutRef.current = null
+    }, 5000)
+  }
+
+  function dismissUndo() {
+    if (undoTimeoutRef.current !== null) window.clearTimeout(undoTimeoutRef.current)
+    undoTimeoutRef.current = null
+    setUndoEntry(null)
+  }
+
+  function performUndo() {
+    const entry = undoEntry
+    dismissUndo()
+    if (!entry) return
+
+    if (entry.kind === 'note') {
+      setNotes((current) => [...current.slice(0, entry.index), entry.note, ...current.slice(entry.index)])
+    } else if (entry.kind === 'workflow') {
+      setWorkflows((current) => [...current.slice(0, entry.index), entry.workflow, ...current.slice(entry.index)])
+    } else {
+      setWorkflows(entry.workflows)
+    }
+  }
+
+  function handleCalculatorChange(key: keyof CalculatorState, value: string) {
+    setCalculator((current) => ({ ...current, [key]: value }))
+  }
+
   async function enableNotifications() {
     if (!('Notification' in window)) return
     const permission = await Notification.requestPermission()
     setNotificationPermission(permission)
   }
-
-  function openWorkflowEditor(workflow?: Workflow) {
-    setEditingWorkflowId(workflow?.id ?? null)
-    setWorkflowDraft(
-      workflow
-        ? { time: workflow.time, title: workflow.title, body: workflow.body, reminderEnabled: workflow.reminderEnabled, reminderMinutes: workflow.reminderMinutes }
-        : { time: '', title: '', body: '', reminderEnabled: true, reminderMinutes: 10 },
-    )
-    setWorkflowEditorOpen(true)
-  }
-
-  function closeWorkflowEditor() {
-    setWorkflowEditorOpen(false)
-    setEditingWorkflowId(null)
-    setWorkflowDraft({ time: '', title: '', body: '', reminderEnabled: true, reminderMinutes: 10 })
-  }
-
-  function handleWorkflowSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const time = workflowDraft.time.trim()
-    const title = workflowDraft.title.trim()
-    const body = workflowDraft.body.trim()
-    if (!time || !title || !body) return
-
-    const nextWorkflow: Workflow = {
-      id: editingWorkflowId ?? crypto.randomUUID(),
-      time,
-      title,
-      body,
-      reminderEnabled: workflowDraft.reminderEnabled,
-      reminderMinutes: workflowDraft.reminderMinutes,
-    }
-
-    setWorkflows((current) =>
-      editingWorkflowId
-        ? current.map((workflow) => (workflow.id === editingWorkflowId ? nextWorkflow : workflow))
-        : [...current, nextWorkflow],
-    )
-    closeWorkflowEditor()
-  }
-
-  function deleteWorkflow(id: string) {
-    setWorkflows((current) => current.filter((workflow) => workflow.id !== id))
-    if (editingWorkflowId === id) closeWorkflowEditor()
-  }
-
-  function restoreDefaultWorkflows() {
-    setWorkflows(defaultWorkflows)
-    closeWorkflowEditor()
-  }
-
-  async function uploadCloudFile(file: File) {
-    if (!uploadWorkerUrl) throw new Error('没有配置上传服务地址。')
-    if (!uploadKey.trim()) throw new Error('请先填写上传密钥。')
-
-    const formData = new FormData()
-    formData.append('file', file)
-
-    const response = await fetch(uploadWorkerUrl, {
-      method: 'POST',
-      headers: {
-        'x-upload-key': uploadKey.trim(),
-      },
-      body: formData,
-    })
-
-    const payload = await response.json() as { file?: Omit<UploadedFile, 'id'>; error?: string }
-    if (!response.ok || !payload.file) {
-      throw new Error(payload.error || '上传失败。')
-    }
-
-    return {
-      id: crypto.randomUUID(),
-      ...payload.file,
-    }
-  }
-
-  async function readCloudResponse(response: Response) {
-    const contentType = response.headers.get('content-type') || 'application/octet-stream'
-    if (!response.ok) {
-      const payload = await response.json() as { error?: string }
-      throw new Error(payload.error || '请求上传文件服务失败。')
-    }
-    return { contentType, response }
-  }
-
-  async function refreshUploadedFiles() {
-    if (!uploadWorkerUrl) {
-      setCloudFileMessage('需要先配置 VITE_UPLOAD_WORKER_URL 才能读取。')
-      return
-    }
-    if (!uploadKey.trim()) {
-      setCloudFileMessage('请先填写上传密钥，再读取私密仓库文件。')
-      return
-    }
-
-    setCloudLoading(true)
-    setCloudFileMessage('正在读取私密 GitHub 仓库文件...')
-    try {
-      const response = await fetch(`${uploadWorkerUrl}?action=list`, {
-        headers: { 'x-upload-key': uploadKey.trim() },
-      })
-      const { response: checkedResponse } = await readCloudResponse(response)
-      const payload = await checkedResponse.json() as { files: Omit<UploadedFile, 'id'>[] }
-      const filesFromRepository = payload.files.map((file) => ({ id: crypto.randomUUID(), ...file }))
-      setUploadedFiles(filesFromRepository)
-      setCloudFileMessage(`已读取 ${filesFromRepository.length} 个私密仓库文件。`)
-    } catch (error) {
-      setCloudFileMessage(error instanceof Error ? error.message : '读取文件失败，请稍后重试。')
-    } finally {
-      setCloudLoading(false)
-    }
-  }
-
-  async function handleCloudFiles(fileList: FileList | null) {
-    if (!fileList?.length || cloudUploading) return
-
-    setCloudUploading(true)
-    setCloudFileMessage(`正在上传 ${fileList.length} 个文件到私密 GitHub 仓库...`)
-
-    try {
-      const uploaded = await Promise.all(Array.from(fileList).map((file) => uploadCloudFile(file)))
-      setUploadedFiles((current) => [...uploaded, ...current])
-      setCloudFileMessage(`${uploaded.length} 个文件已上传到私密 GitHub 仓库。`)
-    } catch (error) {
-      setCloudFileMessage(error instanceof Error ? error.message : '上传失败，请稍后重试。')
-    } finally {
-      setCloudUploading(false)
-      if (cloudFileInputRef.current) cloudFileInputRef.current.value = ''
-    }
-  }
-
-  async function fetchCloudFile(file: UploadedFile, download = false) {
-    if (!uploadWorkerUrl || !uploadKey.trim()) {
-      setCloudFileMessage('请先配置上传服务并填写上传密钥。')
-      return null
-    }
-
-    const endpoint = new URL(uploadWorkerUrl)
-    endpoint.searchParams.set('action', 'file')
-    endpoint.searchParams.set('path', file.path)
-    if (download) endpoint.searchParams.set('download', '1')
-
-    const response = await fetch(endpoint, { headers: { 'x-upload-key': uploadKey.trim() } })
-    const { contentType } = await readCloudResponse(response)
-    const blob = await response.blob()
-    return { blob, contentType }
-  }
-
-  async function previewCloudFile(file: UploadedFile) {
-    try {
-      const result = await fetchCloudFile(file)
-      if (!result) return
-      const url = URL.createObjectURL(result.blob)
-      const preview: PreviewFile = { name: file.name, type: result.contentType, url }
-      if (result.contentType.startsWith('text/') || result.contentType === 'application/json') {
-        preview.text = await result.blob.text()
-      }
-      setPreviewFile(preview)
-    } catch (error) {
-      setCloudFileMessage(error instanceof Error ? error.message : '预览文件失败，请稍后重试。')
-    }
-  }
-
-  async function downloadCloudFile(file: UploadedFile) {
-    try {
-      const result = await fetchCloudFile(file, true)
-      if (!result) return
-      const url = URL.createObjectURL(result.blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = file.name
-      link.click()
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-    } catch (error) {
-      setCloudFileMessage(error instanceof Error ? error.message : '下载文件失败，请稍后重试。')
-    }
-  }
-
-  function closePreview() {
-    if (previewFile) URL.revokeObjectURL(previewFile.url)
-    setPreviewFile(null)
-  }
-
-  useEffect(() => {
-    if (uploadKey.trim()) void refreshUploadedFiles()
-  }, [])
 
   return (
     <main className="shell">
@@ -600,231 +399,29 @@ export function App() {
                 </span>
               )}
             </div>
+            {reminderMessage && (
+              <button
+                type="button"
+                className="reminder-close"
+                aria-label="关闭提醒消息"
+                onClick={() => setReminderMessage('')}
+              >
+                <X size={14} />
+              </button>
+            )}
           </section>
         )}
 
-        <section className="overview-grid" id="overview" aria-label="运营概览">
-          <article className="signal-card">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Control loop</p>
-                <h3>日常巡检流程</h3>
-              </div>
-              <div className="section-actions">
-                <button type="button" className="icon-text-button" onClick={() => openWorkflowEditor()}>
-                  <Plus size={16} />
-                  新增流程
-                </button>
-                <button type="button" className="icon-button" title="编辑巡检流程" onClick={() => setWorkflowEditorOpen((open) => !open)}>
-                  <Pencil size={17} />
-                </button>
-                <Activity size={20} />
-              </div>
-            </div>
-            <div className="timeline">
-              {workflows.length === 0 ? (
-                <p className="empty-state">还没有巡检流程，请新增一条或恢复默认流程。</p>
-              ) : workflows.map((workflow) => (
-                <div className="timeline-row" key={workflow.id}>
-                  <span>{workflow.time}</span>
-                  <strong>{workflow.title}</strong>
-                  <p>{workflow.body}</p>
-                  {workflowEditorOpen && (
-                    <div className="timeline-actions">
-                      <button type="button" className="icon-button" title="编辑" onClick={() => openWorkflowEditor(workflow)}>
-                        <Pencil size={15} />
-                      </button>
-                      <button type="button" className="icon-button" title="删除" onClick={() => deleteWorkflow(workflow.id)}>
-                        <X size={15} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-            {workflowEditorOpen && (
-              <form className="workflow-editor" onSubmit={handleWorkflowSubmit}>
-                <div className="workflow-editor-heading">
-                  <strong>{editingWorkflowId ? '编辑巡检流程' : '新增巡检流程'}</strong>
-                  <button type="button" className="icon-button" title="关闭编辑" onClick={closeWorkflowEditor}>
-                    <X size={16} />
-                  </button>
-                </div>
-                <div className="workflow-editor-fields">
-                  <label>
-                    <span>时间</span>
-                    <input type="text" placeholder="例如 09:30" value={workflowDraft.time} onChange={(event) => setWorkflowDraft((draft) => ({ ...draft, time: event.target.value }))} />
-                  </label>
-                  <label>
-                    <span>流程名称</span>
-                    <input type="text" placeholder="例如 库存与断货风险" value={workflowDraft.title} onChange={(event) => setWorkflowDraft((draft) => ({ ...draft, title: event.target.value }))} />
-                  </label>
-                  <label className="workflow-body-field">
-                    <span>检查说明</span>
-                    <textarea placeholder="写下这一步要检查的内容" value={workflowDraft.body} onChange={(event) => setWorkflowDraft((draft) => ({ ...draft, body: event.target.value }))} />
-                  </label>
-                  <div className="workflow-reminder-field">
-                    <span>提醒设置</span>
-                    <div className="workflow-reminder-controls">
-                      <label className="toggle-row">
-                        <input type="checkbox" checked={workflowDraft.reminderEnabled} onChange={(event) => setWorkflowDraft((draft) => ({ ...draft, reminderEnabled: event.target.checked }))} />
-                        <span>开启提醒</span>
-                      </label>
-                      <select value={workflowDraft.reminderMinutes} disabled={!workflowDraft.reminderEnabled} onChange={(event) => setWorkflowDraft((draft) => ({ ...draft, reminderMinutes: Number(event.target.value) }))}>
-                        <option value={0}>准时</option>
-                        <option value={5}>提前 5 分钟</option>
-                        <option value={10}>提前 10 分钟</option>
-                        <option value={30}>提前 30 分钟</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-                <div className="workflow-editor-actions">
-                  <button type="submit" className="icon-text-button primary-button">
-                    <Save size={16} />
-                    保存流程
-                  </button>
-                  <button type="button" className="icon-text-button" onClick={restoreDefaultWorkflows}>
-                    恢复默认
-                  </button>
-                </div>
-              </form>
-            )}
-          </article>
+        <OverviewPanel
+          workflows={workflows}
+          onSave={saveWorkflow}
+          onDelete={deleteWorkflow}
+          onRestoreDefaults={restoreDefaultWorkflows}
+        />
 
-        </section>
+        <CalculatorPanel calculator={calculator} onChange={handleCalculatorChange} />
 
-        <section className="split-grid">
-          <article className="panel" id="calculator">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Margin desk</p>
-                <h3>单品利润测算</h3>
-              </div>
-              <Calculator size={20} />
-            </div>
-
-            <div className="calculator-grid">
-              {Object.entries({
-                salePrice: '售价',
-                cost: '采购成本',
-                shipping: '头程/物流',
-                fbaFee: 'FBA 费用',
-                adSpend: '单件广告',
-                referralRate: '佣金比例 %',
-              }).map(([key, label]) => (
-                <label key={key}>
-                  <span>{label}</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={calculator[key as keyof CalculatorState]}
-                    onChange={(event) =>
-                      setCalculator((current) => ({
-                        ...current,
-                        [key]: Number(event.target.value),
-                      }))
-                    }
-                  />
-                </label>
-              ))}
-            </div>
-
-            <div className="result-strip">
-              <div>
-                <span>预估利润</span>
-                <strong className={financials.profit >= 0 ? 'positive' : 'negative'}>
-                  ${financials.profit.toFixed(2)}
-                </strong>
-              </div>
-              <div>
-                <span>利润率</span>
-                <strong>{financials.margin.toFixed(1)}%</strong>
-              </div>
-              <div>
-                <span>ROI</span>
-                <strong>{financials.roi.toFixed(1)}%</strong>
-              </div>
-            </div>
-          </article>
-
-        </section>
-
-        <section className="file-workspace" id="files">
-          <article className="panel">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">GitHub vault</p>
-                <h3>上传文件区</h3>
-              </div>
-              <button
-                type="button"
-                className="icon-button"
-                title="刷新私密仓库文件"
-                disabled={cloudLoading}
-                onClick={() => void refreshUploadedFiles()}
-              >
-                <Search size={17} />
-              </button>
-            </div>
-
-            <input
-              className="sr-only"
-              ref={cloudFileInputRef}
-              type="file"
-              multiple
-              onChange={(event) => void handleCloudFiles(event.target.files)}
-            />
-
-            <label className="upload-key-field">
-              <span>上传密钥</span>
-              <input
-                type="password"
-                placeholder="输入 Worker 上传密钥"
-                value={uploadKey}
-                onChange={(event) => setUploadKey(event.target.value)}
-              />
-            </label>
-
-            <button
-              className="upload-zone cloud-upload-zone"
-              type="button"
-              disabled={!uploadWorkerUrl || !uploadKey.trim() || cloudUploading}
-              onClick={() => cloudFileInputRef.current?.click()}
-            >
-              <FileUp size={24} />
-              <span>{cloudUploading ? '正在上传...' : '上传到私密 GitHub 仓库'}</span>
-              <small>{cloudFileMessage}</small>
-            </button>
-
-            <div className="file-list">
-              {uploadedFiles.length === 0 ? (
-                <p className="empty-state">暂无文件。填写上传密钥后点击刷新，即可读取私密仓库中的文件。</p>
-              ) : (
-                uploadedFiles.map((file) => (
-                  <div className="file-row cloud-file-row" key={file.id}>
-                    <FileText size={18} />
-                    <div>
-                      <strong>{file.name}</strong>
-                      <span>
-                        {formatBytes(file.size)} · {file.uploadedAt ? new Date(file.uploadedAt).toLocaleString('zh-CN') : '仓库文件'}
-                      </span>
-                      <small>{file.path}</small>
-                    </div>
-                    <div className="cloud-file-actions">
-                      <button type="button" title="预览文件" onClick={() => void previewCloudFile(file)}>
-                        <ExternalLink size={16} />
-                      </button>
-                      <button type="button" title="下载文件" onClick={() => void downloadCloudFile(file)}>
-                        <Download size={16} />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </article>
-        </section>
+        <FilesPanel />
 
         <NotesPanel
           notes={notes}
@@ -839,10 +436,7 @@ export function App() {
           onCreatedAtChange={setNoteCreatedAt}
           onDueAtChange={setNoteDueAt}
           onSubmit={handleNoteSubmit}
-          onDelete={(id) => {
-            setNotes((current) => current.filter((item) => item.id !== id))
-            if (editingNoteId === id) cancelNoteEdit()
-          }}
+          onDelete={deleteNote}
           editingNoteId={editingNoteId}
           onEdit={startNoteEdit}
           onCancelEdit={cancelNoteEdit}
@@ -854,34 +448,21 @@ export function App() {
           <Settings size={18} />
         </footer>
 
-        {previewFile && (
-          <div className="preview-backdrop" role="presentation" onClick={closePreview}>
-            <section className="preview-dialog" role="dialog" aria-modal="true" aria-label={`预览 ${previewFile.name}`} onClick={(event) => event.stopPropagation()}>
-              <div className="preview-heading">
-                <div>
-                  <p className="eyebrow">File preview</p>
-                  <h3>{previewFile.name}</h3>
-                </div>
-                <button type="button" className="icon-button" title="关闭预览" onClick={closePreview}>
-                  <X size={17} />
-                </button>
-              </div>
-              <div className="preview-content">
-                {previewFile.text !== undefined ? (
-                  <pre>{previewFile.text}</pre>
-                ) : previewFile.type.startsWith('image/') ? (
-                  <img src={previewFile.url} alt={previewFile.name} />
-                ) : previewFile.type === 'application/pdf' ? (
-                  <iframe title={previewFile.name} src={previewFile.url} />
-                ) : previewFile.type.startsWith('video/') ? (
-                  <video controls src={previewFile.url} />
-                ) : previewFile.type.startsWith('audio/') ? (
-                  <audio controls src={previewFile.url} />
-                ) : (
-                  <p className="empty-state">这个文件类型不能在网页内预览，请关闭窗口后点击下载。</p>
-                )}
-              </div>
-            </section>
+        {undoEntry && (
+          <div className="undo-toast" role="status">
+            <span>
+              {undoEntry.kind === 'note'
+                ? '备忘已删除'
+                : undoEntry.kind === 'workflow'
+                  ? '巡检流程已删除'
+                  : '已恢复默认巡检流程'}
+            </span>
+            <button type="button" className="undo-button" onClick={performUndo}>
+              撤销
+            </button>
+            <button type="button" className="icon-button undo-close" aria-label="关闭提示" onClick={dismissUndo}>
+              <X size={14} />
+            </button>
           </div>
         )}
       </section>
