@@ -637,7 +637,7 @@ p {
   resize: vertical;
 }
 
-.note-due-field {
+.note-time-fields label {
   display: grid;
   gap: 6px;
 }
@@ -649,9 +649,12 @@ p {
   gap: 12px;
 }
 
-.note-composer-footer .note-due-field {
+.note-time-fields {
   flex: 1;
-  max-width: 360px;
+  max-width: 560px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .note-due {
@@ -896,8 +899,9 @@ p {
     flex-direction: column;
   }
 
-  .note-composer-footer .note-due-field {
+  .note-time-fields {
     max-width: none;
+    grid-template-columns: 1fr;
   }
 
   .timeline-actions {

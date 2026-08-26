@@ -166,6 +166,19 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`
 }
 
+function toDateTimeLocal(value: string | Date) {
+  const date = typeof value === 'string' ? new Date(value) : value
+  if (Number.isNaN(date.getTime())) return ''
+
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return localDate.toISOString().slice(0, 16)
+}
+
+function toISOStringOrNow(value: string) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString()
+}
+
 export function App() {
   const [notes, setNotes] = useState<Note[]>(readStoredNotes)
   const [workflows, setWorkflows] = useState<Workflow[]>(readStoredWorkflows)
@@ -175,6 +188,7 @@ export function App() {
   const [noteTitle, setNoteTitle] = useState('')
   const [noteBody, setNoteBody] = useState('')
   const [noteTag, setNoteTag] = useState('运营')
+  const [noteCreatedAt, setNoteCreatedAt] = useState(() => toDateTimeLocal(new Date()))
   const [noteDueAt, setNoteDueAt] = useState('')
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>(readStoredUploadedFiles)
@@ -308,17 +322,18 @@ export function App() {
       title: noteTitle.trim() || '未命名备忘',
       body: noteBody.trim(),
       tag: noteTag.trim() || '运营',
-      createdAt: new Date().toISOString(),
+      createdAt: toISOStringOrNow(noteCreatedAt),
       dueAt: noteDueAt || undefined,
     }
 
     setNotes((current) => editingNoteId
-      ? current.map((note) => note.id === editingNoteId ? { ...nextNote, createdAt: note.createdAt } : note)
+      ? current.map((note) => note.id === editingNoteId ? nextNote : note)
       : [nextNote, ...current])
     setEditingNoteId(null)
     setNoteTitle('')
     setNoteBody('')
     setNoteTag('运营')
+    setNoteCreatedAt(toDateTimeLocal(new Date()))
     setNoteDueAt('')
   }
 
@@ -327,6 +342,7 @@ export function App() {
     setNoteTitle(note.title)
     setNoteBody(note.body)
     setNoteTag(note.tag)
+    setNoteCreatedAt(toDateTimeLocal(note.createdAt))
     setNoteDueAt(note.dueAt || '')
     document.getElementById('notes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
@@ -336,6 +352,7 @@ export function App() {
     setNoteTitle('')
     setNoteBody('')
     setNoteTag('运营')
+    setNoteCreatedAt(toDateTimeLocal(new Date()))
     setNoteDueAt('')
   }
 
@@ -814,10 +831,12 @@ export function App() {
           noteTitle={noteTitle}
           noteBody={noteBody}
           noteTag={noteTag}
+          noteCreatedAt={noteCreatedAt}
           noteDueAt={noteDueAt}
           onTitleChange={setNoteTitle}
           onBodyChange={setNoteBody}
           onTagChange={setNoteTag}
+          onCreatedAtChange={setNoteCreatedAt}
           onDueAtChange={setNoteDueAt}
           onSubmit={handleNoteSubmit}
           onDelete={(id) => {

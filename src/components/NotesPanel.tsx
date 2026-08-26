@@ -7,10 +7,12 @@ type NotesPanelProps = {
   noteTitle: string
   noteBody: string
   noteTag: string
+  noteCreatedAt: string
   noteDueAt: string
   onTitleChange: Dispatch<SetStateAction<string>>
   onBodyChange: Dispatch<SetStateAction<string>>
   onTagChange: Dispatch<SetStateAction<string>>
+  onCreatedAtChange: Dispatch<SetStateAction<string>>
   onDueAtChange: Dispatch<SetStateAction<string>>
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onDelete: (id: string) => void
@@ -34,10 +36,12 @@ export function NotesPanel({
   noteTitle,
   noteBody,
   noteTag,
+  noteCreatedAt,
   noteDueAt,
   onTitleChange,
   onBodyChange,
   onTagChange,
+  onCreatedAtChange,
   onDueAtChange,
   onSubmit,
   onDelete,
@@ -45,6 +49,10 @@ export function NotesPanel({
   onEdit,
   onCancelEdit,
 }: NotesPanelProps) {
+  const timelineNotes = [...notes].sort(
+    (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  )
+
   return (
     <section className="split-grid notes-section">
       <article className="panel" id="notes">
@@ -79,10 +87,16 @@ export function NotesPanel({
             onChange={(event) => onBodyChange(event.target.value)}
           />
           <div className="note-composer-footer">
-            <label className="note-due-field">
-              <span>提醒时间（可选）</span>
-              <input type="datetime-local" value={noteDueAt} onChange={(event) => onDueAtChange(event.target.value)} />
-            </label>
+            <div className="note-time-fields">
+              <label>
+                <span>创建时间</span>
+                <input type="datetime-local" value={noteCreatedAt} onChange={(event) => onCreatedAtChange(event.target.value)} />
+              </label>
+              <label>
+                <span>提醒时间（可选）</span>
+                <input type="datetime-local" value={noteDueAt} onChange={(event) => onDueAtChange(event.target.value)} />
+              </label>
+            </div>
             <div className="note-composer-actions">
               <button type="submit">
                 {editingNoteId ? <Pencil size={16} /> : <Plus size={16} />}
@@ -98,7 +112,7 @@ export function NotesPanel({
         </form>
 
         <div className="note-timeline">
-          {notes.map((note) => {
+          {timelineNotes.map((note) => {
             const date = formatNoteDate(note.createdAt)
 
             return (
