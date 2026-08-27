@@ -1,18 +1,33 @@
+/* 设计令牌：参考 Linear 设计语言（近黑画布 + 薰衣草蓝紫唯一彩色 accent + hairline 细边框分层） */
 :root {
-  --paper: #f4f1ea;
-  --surface: #fffdf8;
-  --surface-strong: #ebe6db;
-  --ink: #171611;
-  --muted: #6e6a5f;
-  --line: #d8d1c2;
-  --teal: #0d766f;
-  --teal-soft: #e3f1ed;
-  --amber: #c77d1b;
-  --red: #a93f35;
-  --shadow: 0 18px 40px rgba(45, 38, 25, 0.08);
+  /* 表面层级（4 步阶梯） */
+  --paper: #010102; /* Canvas：近纯黑，带极淡蓝调 */
+  --surface: #0f1011; /* Surface 1：卡片 */
+  --surface-strong: #18191a; /* Surface 3：结果条、浮层 */
+  --line: #23252a; /* Hairline：1px 卡片边框 */
+  --line-strong: #34343a; /* Hairline Strong：聚焦边框 */
+
+  /* 文字层级 */
+  --ink: #f7f8f8; /* Ink：标题与强调正文 */
+  --ink-muted: #d0d6e0; /* Ink Muted：次级正文 */
+  --muted: #8a8f98; /* Ink Subtle：元信息、说明 */
+  --ink-tertiary: #62666d; /* Ink Tertiary：禁用、脚注 */
+
+  /* 强调色：Lavender-Blue（唯一彩色 accent） */
+  --teal: #5e6ad2; /* 主操作、品牌、链接 */
+  --teal-soft: #14172e; /* lavender 弱底 */
+  --teal-hover: #828fff; /* hover 态 */
+
+  /* 语义色 */
+  --amber: #f2c94c; /* 提醒、警示 */
+  --red: #eb5757; /* 负利润、删除、库存风险 */
+  --green: #27a644; /* 正利润、成功 */
+
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   --sans: Aptos, 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
   --mono: 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
 
+  color-scheme: dark;
   color: var(--ink);
   background: var(--paper);
   font-family: var(--sans);
@@ -21,6 +36,11 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  scrollbar-color: var(--line-strong) var(--paper);
+  scrollbar-width: thin;
 }
 
 * {
@@ -46,11 +66,17 @@ button {
   cursor: pointer;
 }
 
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid rgba(13, 118, 111, 0.3);
+  outline: 3px solid rgba(94, 106, 210, 0.5);
   outline-offset: 2px;
 }
 
@@ -116,14 +142,15 @@ p {
 }
 
 .nav-list a:hover {
-  background: var(--paper);
+  background: #141516;
   border-color: var(--line);
 }
 
 .nav-list a.active {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--surface);
+  background: #18191a;
+  border-color: var(--line);
+  color: var(--ink);
+  box-shadow: inset 2px 0 0 var(--teal);
 }
 
 .sidebar-foot {
@@ -178,10 +205,10 @@ p {
 }
 
 .note-form button {
-  border: 1px solid var(--ink);
+  border: 1px solid var(--teal);
   border-radius: 6px;
-  color: var(--surface);
-  background: var(--ink);
+  color: #f7f8f8;
+  background: var(--teal);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -189,14 +216,18 @@ p {
   padding: 0 13px;
 }
 
+.note-form button:hover {
+  background: var(--teal-hover);
+}
+
 .reminder-bar {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  border: 1px solid #d7b36b;
+  border: 1px solid #4d4213;
   border-radius: 8px;
-  background: #fff5d9;
-  color: #624713;
+  background: #201b0a;
+  color: var(--amber);
   padding: 10px 12px;
 }
 
@@ -206,7 +237,7 @@ p {
 }
 
 .reminder-bar span {
-  color: #806735;
+  color: #b8a55e;
   font-size: 13px;
 }
 
@@ -272,6 +303,8 @@ p {
 
 .section-heading h3 {
   font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
 }
 
 .section-actions,
@@ -310,14 +343,14 @@ p {
 }
 
 .primary-button {
-  border-color: var(--ink);
-  color: var(--surface);
-  background: var(--ink);
+  border-color: var(--teal);
+  color: #f7f8f8;
+  background: var(--teal);
 }
 
 .primary-button:hover {
-  color: var(--surface);
-  background: var(--teal);
+  color: #f7f8f8;
+  background: var(--teal-hover);
 }
 
 .timeline {
@@ -358,7 +391,7 @@ p {
 }
 
 .timeline-row p {
-  color: var(--muted);
+  color: var(--ink-muted);
 }
 
 .timeline-actions {
@@ -410,7 +443,7 @@ p {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: #fffefa;
+  background: #0c0d0e;
   color: var(--ink);
   padding: 9px;
 }
@@ -452,7 +485,7 @@ p {
 .note-due-field input {
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: #fffefa;
+  background: #0c0d0e;
   color: var(--ink);
   padding: 8px 9px;
 }
@@ -527,7 +560,7 @@ p {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: #fffefa;
+  background: #0c0d0e;
   color: var(--ink);
   padding: 10px;
 }
@@ -563,8 +596,8 @@ p {
 }
 
 .result-strip .result-primary.negative {
-  background: #f9e7e3;
-  border-color: #e2b6ae;
+  background: #2a1414;
+  border-color: #5c2626;
 }
 
 .result-strip .result-secondary strong {
@@ -572,7 +605,7 @@ p {
 }
 
 .positive {
-  color: var(--teal);
+  color: var(--green);
 }
 
 .negative {
@@ -608,7 +641,7 @@ p {
 .cloud-upload-zone {
   margin-top: 12px;
   border-color: var(--amber);
-  background: #fff5d9;
+  background: #201b0a;
 }
 
 .upload-key-field {
@@ -625,7 +658,7 @@ p {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: #fffefa;
+  background: #0c0d0e;
   color: var(--ink);
   padding: 10px;
 }
@@ -823,6 +856,7 @@ p {
 
 /* 保留备忘正文中的换行，长英文单词也允许断行 */
 .note-card p {
+  color: var(--ink-muted);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -852,7 +886,7 @@ p {
 }
 
 .note-tag.tag-pricing {
-  color: #3b6ea5;
+  color: #6e9fff;
 }
 
 .note-tag.tag-review {
@@ -866,7 +900,7 @@ p {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(23, 22, 17, 0.55);
+  background: rgba(0, 0, 0, 0.7);
 }
 
 .preview-dialog {
@@ -876,7 +910,7 @@ p {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
-  box-shadow: 0 24px 70px rgba(23, 22, 17, 0.25);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
 }
@@ -900,7 +934,7 @@ p {
   display: grid;
   place-items: center;
   padding: 20px;
-  background: #eeeae1;
+  background: #0c0d0e;
 }
 
 .preview-content img,
@@ -929,7 +963,7 @@ p {
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: #fffefa;
+  background: #141516;
   color: var(--ink);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -1102,7 +1136,7 @@ p {
 }
 
 .undo-button:hover {
-  background: #0a5f5a;
+  background: var(--teal-hover);
 }
 
 .undo-close {
@@ -1119,14 +1153,14 @@ p {
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
-  color: #624713;
+  color: var(--amber);
   display: grid;
   place-items: center;
 }
 
 .reminder-close:hover {
-  border-color: #d7b36b;
-  background: rgba(199, 125, 27, 0.08);
+  border-color: #4d4213;
+  background: rgba(242, 201, 76, 0.08);
 }
 
 .upload-zone-label {
@@ -1138,7 +1172,7 @@ p {
 .spinner {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(13, 118, 111, 0.25);
+  border: 2px solid rgba(94, 106, 210, 0.25);
   border-top-color: var(--teal);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
