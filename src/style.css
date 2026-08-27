@@ -821,6 +821,23 @@ p {
   font-size: 12px;
 }
 
+/* 保留备忘正文中的换行，长英文单词也允许断行 */
+.note-card p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.note-card strong {
+  overflow-wrap: anywhere;
+}
+
+/* 编辑中的备忘卡片与巡检行一致的高亮 */
+.note-card.editing {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+  box-shadow: inset 3px 0 0 var(--teal);
+}
+
 /* 常见标签按语义配色 */
 .note-tag.tag-ad {
   color: var(--amber);
@@ -925,12 +942,28 @@ p {
     grid-template-columns: 1fr;
   }
 
+  /* 窄屏下导航吸顶常驻，滚动到底部也能随时切换模块 */
   .sidebar {
-    position: static;
+    position: sticky;
+    top: 0;
     height: auto;
+    z-index: 15;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+  }
+
+  .brand-block h1 {
+    font-size: 16px;
+  }
+
+  .sidebar-foot {
+    display: none;
   }
 
   .nav-list {
+    flex: 1;
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
@@ -946,6 +979,15 @@ p {
   .workspace,
   .sidebar {
     padding: 14px;
+  }
+
+  .sidebar {
+    padding: 10px;
+  }
+
+  /* 小屏下吸顶栏只保留导航，品牌区让位 */
+  .brand-block {
+    display: none;
   }
 
   .topbar {

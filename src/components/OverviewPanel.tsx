@@ -1,5 +1,5 @@
 import { Activity, Bell, Pencil, Plus, Save, X } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Workflow } from '../types'
 
@@ -77,6 +77,12 @@ export function OverviewPanel({ workflows, onSave, onDelete, onRestoreDefaults }
     closeEditor()
   }
 
+  // 按时间升序展示，保证时间线顺序与实际执行顺序一致
+  const sortedWorkflows = useMemo(
+    () => [...workflows].sort((left, right) => left.time.localeCompare(right.time)),
+    [workflows],
+  )
+
   return (
     <section className="overview-grid" id="overview" aria-label="运营概览">
       <article className="signal-card">
@@ -97,7 +103,7 @@ export function OverviewPanel({ workflows, onSave, onDelete, onRestoreDefaults }
           {workflows.length === 0 ? (
             <p className="empty-state">还没有巡检流程，请新增一条或恢复默认流程。</p>
           ) : (
-            workflows.map((workflow) => (
+            sortedWorkflows.map((workflow) => (
               <div className={`timeline-row ${editingId === workflow.id ? 'editing' : ''}`} key={workflow.id}>
                 <span className="timeline-time">
                   <span>{workflow.time}</span>

@@ -156,6 +156,9 @@ export function NotesPanel({
         </form>
 
         <div className="note-timeline">
+          {noteGroups.length === 0 && (
+            <p className="empty-state">还没有备忘。用上方表单记录今天第一条运营动作。</p>
+          )}
           {noteGroups.map((group) => (
             <div className="note-day-group" key={group.key}>
               <div className="note-day-label">{group.label}</div>
@@ -168,7 +171,7 @@ export function NotesPanel({
                       <strong>{time}</strong>
                     </div>
                     <div className="note-marker" aria-hidden="true" />
-                    <div className="note-card">
+                    <div className={`note-card ${editingNoteId === note.id ? 'editing' : ''}`}>
                       <div>
                         <span className={`note-tag ${TAG_CLASSES[note.tag] || ''}`}>{note.tag}</span>
                         <div className="note-card-actions">
